@@ -7,6 +7,7 @@ const {
   PORT,
   DISCORD_BOT_TOKEN,
 } = require('./config');
+
 /////命令及回應指令
 const commandsAndResponses = require("./commandsAndResponses");
 
