@@ -1,35 +1,39 @@
-const { Client, Intents } = require("discord.js");
-const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
-
 //////////////////////////////////////////////////
-const {
-  PORT,
-  DISCORD_BOT_TOKEN,
-} = require('./config');
-
-/////命令及回應指令
-const { commandsAndResponses } = require("./commandsAndResponses");
-
+require('dotenv').config()
 //////////////////////////////////////////////////
+const { Client, Intents } = require('discord.js');
+const responses = require('./responses');
+const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+
+function getRandomResponse(responses) {
+  if (!responses || responses.length === 0) {
+    return null;
+  }
+  const randomIndex = Math.floor(Math.random() * responses.length);
+  return responses[randomIndex];
+}
+
 /////開機/////
 client.on("ready", () => {
   client.user.setPresence({ activities: [{ name: 'Izuna' }], status: 'Online' });
   console.log(`${client.user.tag}已上線!`);
-
-  client.application.commands.set(Object.values(commandsAndResponses)).then(() => {
-    console.log("Slash commands registered.");
-  }).catch(console.error);
 });
 
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isCommand()) return;
 
-  const { commandName, options } = interaction;
-
-  if (commandsAndResponses[commandName]) {
-    const response = commandsAndResponses[commandName].getRandomResponse();
-    await interaction.reply(response);
+client.on('messageCreate', msg => {
+  const messageContent = msg.content.toLowerCase();
+  let response;
+  if (messageContent === '運勢') {
+    const luck = ["大吉", "中吉", "小吉", "吉", "末吉", "凶", "大凶"];
+    const randomIndex = Math.floor(Math.random() * luck.length);
+    response = `主人今天的運勢是：${luck[randomIndex]}！`;
+  } else {
+    response = getRandomResponse(responses[messageContent]);
+  }
+  if (response) {
+    msg.reply(response);
   }
 });
+
 //////////////////////////////////////////////////
-client.login(DISCORD_BOT_TOKEN);
+client.login(process.env.DISCORD_BOT_TOKEN);
