@@ -14,3 +14,10 @@
 2.取消Slash command，改為直接指令
 3.新增responses.js，內含回覆內容
 4.移除commandsAndResponses.js、Dockerfile
+2023/4/2 
+[1.2.0]
+1.將回應功能移至messageHandler.js 移除responses.js
+2.新增設置每日提醒dailyremind.js
+3.新增設置定時提醒reminder.js
+  使用方法 !rm <月> <日> <時> <分> <提醒事項>
+  範例 !rm 4 2 10 20 天氣真好
