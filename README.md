@@ -21,3 +21,12 @@
 3.新增設置定時提醒reminder.js
   使用方法 !rm <月> <日> <時> <分> <提醒事項>
   範例 !rm 4 2 10 20 天氣真好
+2023/4/4
+[1.3.0]
+1.messageHandler.js、dailyremind.js、reninder.js移至app資料夾
+2.新增將發言紀錄到終端機功能
+3.修正dailyremind筆誤
+4.安裝axios
+5.新增weatherTw.js
+  使用方法:<縣市>天氣
+  範例:台中天氣

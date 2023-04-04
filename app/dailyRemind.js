@@ -5,7 +5,7 @@ const targetTime = [07, 00, 00];// 設定目標時間
 // const message2 = `午安 <@${userId}>!`;// 設置提醒內容
 // const targetTime2 = [10, 10, 30];// 設定目標時間
 
-function dailyremind(client){
+function dailyRemind(client){
     client.on("ready", () => {
       // 計算現在時間與下一個目標時間的時間差
       const now = new Date();
@@ -23,11 +23,11 @@ function dailyremind(client){
         channel.send(message);
       }, 24 * 60 * 60 * 1000);
     }, delay);
-    console.log(`dailtremind 執行中！`);
+    console.log(`dailyRemind 執行中！`);
     });
     };
 
-    // function dailyremind2(client){
+    // function dailyRemind2(client){
     //     client.on("ready", () => {
     //       // 計算現在時間與下一個目標時間的時間差
     //       const now = new Date();
@@ -45,11 +45,11 @@ function dailyremind(client){
     //         channel.send(message2);
     //       }, 24 * 60 * 60 * 1000);
     //     }, delay);
-    //     console.log(`dailtremind2 已上線！`);
+    //     console.log(`dailyRemind2 已上線！`);
     //     });
     //     };
 
     module.exports = {
-        dailyremind,
-       // dailyremind2,
+        dailyRemind,
+       // dailyRemind2,
     };
