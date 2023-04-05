@@ -20,9 +20,9 @@ client.on('messageCreate', async (message) => {
 const { getRandomResponse, handleMessage, responses } = require('./app/messageHandler');
 client.on('messageCreate', handleMessage);
 
-/////設置每日提醒/////
-const {dailyRemind} = require('./app/dailyRemind.js'); 
-dailyRemind(client)
+/////設置每日提醒(暫停)/////
+//const {dailyRemind} = require('./app/dailyRemind.js'); 
+//dailyRemind(client)
 
 /////設置提醒/////
 const {reminder} = require('./app/reminder.js'); 
@@ -33,3 +33,7 @@ client.on('messageCreate', async (message) => {
 /////氣象預報/////
 const { weatherTw } = require('./app/weatherTw.js'); 
 weatherTw(client);
+
+/////每日氣象/////
+const { dailyWeather } = require('./app/dailyWeather.js'); 
+dailyWeather(client);

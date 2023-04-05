@@ -30,3 +30,9 @@
 5.新增weatherTw.js
   使用方法:<縣市>天氣
   範例:台中天氣
+2023/4/5
+[1.4.0]
+1.增加reminder.js提醒設置完成說明
+2.暫停每日提醒dailyRemind.js
+3.安裝node-cron
+4.新增每日氣象功能dailyWeather.js

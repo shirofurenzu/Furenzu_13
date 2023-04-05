@@ -37,7 +37,7 @@ function reminder(message){
         message.reply(`時間到了，提醒您：${reminderText}`); // 回覆提醒訊息
       }, timeDiff);
   
-      message.channel.send('提醒設置完成'); // 回應設置完成訊息
+      message.channel.send(`提醒設置完成\n將於${month}月${date}日${hours}點${minutes}分\n提醒您 ${reminderText}`); // 回應設置完成訊息
       console.log(`目前時間${now}`);
       console.log(`設置時間${remindTime}`);
       console.log(reminderText);
