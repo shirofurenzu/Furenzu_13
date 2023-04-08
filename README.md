@@ -36,3 +36,10 @@
 2.暫停每日提醒dailyRemind.js
 3.安裝node-cron
 4.新增每日氣象功能dailyWeather.js
+2023/4/7
+[1.4.1]
+1.修改dailyWeather.js輸出數據
+2.修改WeatherTW.js輸入來源及輸出數據
+F-C0032-001(原)>>F-D0047-091(新)
+3.修改reminder觸發方式
+!rm(原)>>rm(新)
