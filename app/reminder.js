@@ -1,4 +1,5 @@
-function reminder(message) {
+function reminder(client) {
+  client.on('messageCreate', async (message) => {
   if (message.author.bot) return; // 避免機器人自我觸發
   if (!message.content.startsWith('rm ')) return; // 判斷是否為指令
 
@@ -35,6 +36,7 @@ function reminder(message) {
 
     message.channel.send(`提醒設置完成\n將於${month}月${date}日${hours}點${minutes}分\n提醒您 ${reminderText}`); // 回應設置完成訊息
    }
+  });
 };
 module.exports = {
   reminder,

@@ -43,3 +43,18 @@
 F-C0032-001(原)>>F-D0047-091(新)
 3.修改reminder觸發方式
 !rm(原)>>rm(新)
+2023/4/17
+[1.5.0]
+1.原回應和運勢功能分開為randomResponse和luck
+2.改寫運勢功能
+  使用方法:運勢 或 XXXX運勢
+  範例:運勢 或 本日外出運勢
+3.於messageHandler新增randomChoose功能
+  使用方法:隨機 項目1 項目2 項目3
+  範例:隨機 香蕉 芭樂 柳丁
+4.於messageHandler新增randomNumber功能
+  使用方法:隨機數字 數字1 數字2
+  範例:隨機數字 10 999
+5.簡化app.js中messageHandler及reminder呼叫子程式碼方式
+6.randomResponse 增加骰子
+7.新增以晴天表情符號☀️(discord:sunny:)呼叫天氣功能

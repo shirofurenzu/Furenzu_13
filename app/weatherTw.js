@@ -7,10 +7,9 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 function weatherTw(client) {
   client.on('messageCreate', async (message) => {
-    const isEndingWithWeather = message.content.trim().toLowerCase().endsWith('天氣');
+    const isEndingWithWeather = message.content.trim().toLowerCase().endsWith('天氣') || message.content.trim().toLowerCase().endsWith('☀️');
     if (!isEndingWithWeather || message.author.bot) return;
-    let city = message.content.trim();
-    city = city.slice(0, city.length - 2).trim(); // 移除「天氣」兩個字
+    let city = message.content.trim().replace(/(天氣|☀️)$/i, ''); // 移除「天氣」或「:sunny:」
     city = city.replace(/台/g, "臺");  // 將 "台" 轉換為 "臺"
 
     if (!city) {
