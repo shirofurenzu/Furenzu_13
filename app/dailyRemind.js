@@ -1,55 +1,37 @@
-const channelId = '1088826285482070207'; // 設置提醒的頻道ID
-const userId = '337612075285086209'; // 設置要標記的角色ID
-const message = `早安 <@${userId}>!`;// 設置提醒內容
-const targetTime = [07, 00, 00];// 設定目標時間
-// const message2 = `午安 <@${userId}>!`;// 設置提醒內容
-// const targetTime2 = [10, 10, 30];// 設定目標時間
+const channelId = '1088826285482070207'; 
+const userId = '337612075285086209'; 
+const targetReminders = [
+    {
+        time: [08, 30, 00], // 第一個提醒時間
+        message: `早安 <@${userId}>!` // 第一個提醒消息
+    },
+    {
+        time: [23, 30, 00], // 第二個提醒時間
+        message: `晚安 <@${userId}>!` // 第二個提醒消息
+    }
+    // 可添加更多提醒
+];
 
-function dailyRemind(client){
+function dailyRemind(client) {
     client.on("ready", () => {
-      // 計算現在時間與下一個目標時間的時間差
-      const now = new Date();
-      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(),...targetTime); // 設定目標時間
-      const diff = target.getTime() - now.getTime();
-      const delay = diff > 0 ? diff : 86400000 + diff; // 如果現在時間已經超過了目標時間，則需要加上一個 24 小時的時間差
-     // 等待時間差到達後執行提醒程式碼
-     setTimeout(() => {
-      // 獲取指定的頻道
-      const channel = client.channels.cache.get(channelId);
-      // 發送提醒內容
-      channel.send(message);
-      // 設定每 24 小時執行一次提醒程式碼
-      setInterval(() => {
-        channel.send(message);
-      }, 24 * 60 * 60 * 1000);
-    }, delay);
-    console.log(`dailyRemind 執行中！`);
+        targetReminders.forEach((reminder) => {
+            const now = new Date();
+            const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), ...reminder.time); 
+            let diff = target.getTime() - now.getTime();
+            let delay = diff > 0 ? diff : 86400000 + diff;
+
+            setTimeout(() => {
+                const channel = client.channels.cache.get(channelId);
+                channel.send(reminder.message); // 發送對應的消息內容
+                setInterval(() => {
+                    channel.send(reminder.message); // 每24小時發送對應的消息內容
+                }, 24 * 60 * 60 * 1000); // 重新設定24小時循環
+            }, delay);
+        });
+        console.log(`dailyRemind 執行中！`);
     });
-    };
+}
 
-    // function dailyRemind2(client){
-    //     client.on("ready", () => {
-    //       // 計算現在時間與下一個目標時間的時間差
-    //       const now = new Date();
-    //       const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(),...targetTime2); // 設定目標時間
-    //       const diff = target.getTime() - now.getTime();
-    //       const delay = diff > 0 ? diff : 86400000 + diff; // 如果現在時間已經超過了目標時間，則需要加上一個 24 小時的時間差
-    //      // 等待時間差到達後執行提醒程式碼
-    //      setTimeout(() => {
-    //       // 獲取指定的頻道
-    //       const channel = client.channels.cache.get(channelId);
-    //       // 發送提醒內容
-    //       channel.send(message2);
-    //       // 設定每 24 小時執行一次提醒程式碼
-    //       setInterval(() => {
-    //         channel.send(message2);
-    //       }, 24 * 60 * 60 * 1000);
-    //     }, delay);
-    //     console.log(`dailyRemind2 已上線！`);
-    //     });
-    //     };
-
-    module.exports = {
-        dailyRemind,
-       // dailyRemind2,
-    };
+module.exports = {
+    dailyRemind,
+};
