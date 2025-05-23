@@ -120,3 +120,4 @@ F-C0032-001(原)>>F-D0047-091(新)
 1.於autoReplyWithGPT.js及generateAndSendImage.js新增Google Gemini api功能
 2.新增2頻道供gemini及gemini image 使用
 3.新增models.js，可用於切換模型，使用者不需手動輸入
+4.autoReplyWithGPT.js新增回傳文字分段功能 以避免超過discord 2000字之限制
