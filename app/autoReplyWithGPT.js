@@ -141,11 +141,8 @@ async function handleTranslate(interaction) {
     const userId = interaction.user.id;
     const channelId = interaction.channel.id;
     const text = interaction.options.getString('文字');
-<<<<<<< HEAD
     const targetLang = interaction.options.getString('目標語言') || '台灣繁體中文';
-=======
-    const targetLang = interaction.options.getString('目標語言') || '中文';
->>>>>>> b96f0b64248a58849c1d017e1b3acf81a8cc9d8e
+
     const currentModelInfo = getUserModel(userId, channelId);
 
     // 斜線指令可以在任何頻道使用，但模型翻譯仍需依賴模型設定
