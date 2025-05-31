@@ -434,7 +434,6 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
                 temperature: 0.7, // 控制生成文本的隨機性
             });
             answer = response.choices[0].message.content;
-<<<<<<< HEAD
         }  else if (currentModelInfo.provider === 'gemini') {
     const model = genAI.getGenerativeModel({
         model: currentModelInfo.name,
@@ -482,35 +481,6 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
     const result = await chat.sendMessage(currentMessageForSend); // 發送最新使用者訊息
     answer = result.response.text();
 }
-=======
-        } else if (currentModelInfo.provider === 'gemini') {
-            const model = genAI.getGenerativeModel({
-                model: currentModelInfo.name,
-                systemInstruction: systemPrompt, // 系統提示詞
-                safetySettings: [ // Gemini 的安全設定範例
-                    {
-                        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                    },
-                    {
-                        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                    },
-                ],
-            });
-
-            // 為 Gemini 準備聊天歷史：需要將角色映射（assistant -> model）並包裝在 'parts' 中
-            const historyForGemini = userContext.slice(0, -1).map(msg => ({
-                role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: msg.content }],
-            }));
-            const latestUserMessageContent = userContext[userContext.length - 1].content; // 最後一條是當前的使用者訊息
-
-            const chat = model.startChat({ history: historyForGemini }); // 開始聊天會話，帶入歷史
-            const result = await chat.sendMessage(latestUserMessageContent); // 發送最新使用者訊息
-            answer = result.response.text();
-        }
->>>>>>> b96f0b64248a58849c1d017e1b3acf81a8cc9d8e
 
         userContext.push({ role: 'assistant', content: answer }); // 將 AI 回覆添加到對話歷史
         userSessions.set(userId, userContext); // 更新使用者對話歷史
@@ -564,8 +534,4 @@ module.exports = {
     handleMessage,
     registerSlashCommands,
     slashCommands // 導出指令定義，以便主文件可能需要
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> b96f0b64248a58849c1d017e1b3acf81a8cc9d8e
