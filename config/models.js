@@ -14,8 +14,11 @@ const AVAILABLE_MODELS = [
     { name: 'OpenAI GPT-4.1', value: 'openai/gpt-4.1' },
     { name: 'OpenAI GPT-4.1-mini', value: 'openai/gpt-4.1-mini' },
     { name: 'OpenAI GPT-4.1-nano', value: 'openai/gpt-4.1-nano' },
+    { name: 'OpenAI o3', value: 'openai/o3' },
+    { name: 'OpenAI o4-mini', value: 'openai/o4-mini' },
     { name: 'Gemini 2.5 Flash', value: 'gemini/gemini-2.5-flash-preview-05-20' },
     { name: 'Gemini 2.0 Flash', value: 'gemini/gemini-2.0-flash' },
+    { name: 'Gemini 2.0 Flash Lite', value: 'gemini/gemini-2.0-flash-lite' },
     //{ name: 'Gemini 2.0 Flash Image', value: 'gemini/gemini-2.0-flash-preview-image-generation' },
     // { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro-preview-05-06' },
     // 範例：可以添加更多模型

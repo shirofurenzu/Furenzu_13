@@ -22,6 +22,8 @@ if (process.env.GEMINI_API_KEY) {
 // provider: 'openai' 或 'gemini'
 // name: 模型的具體名稱
 const CHANNEL_MODEL_MAP = {};
+// 建議：未來可考慮使用一個 JSON 環境變數來配置多個頻道，例如：
+// DISCORD_CHANNEL_CONFIG='[{"id":"CHANNEL_ID_1","provider":"openai","model":"gpt-4o"},{"id":"CHANNEL_ID_2","provider":"gemini","model":"gemini-1.5-pro-latest"}]'
 if (process.env.DISCORD_CHANNEL_ID && process.env.OPEN_AI_GPT_MODEL) {
     CHANNEL_MODEL_MAP[process.env.DISCORD_CHANNEL_ID] = { provider: 'openai', name: process.env.OPEN_AI_GPT_MODEL };
 }
@@ -32,37 +34,57 @@ if (process.env.DISCORD_CHANNEL_ID4 && process.env.GOOGLE_GEMINI_MODEL) {
     CHANNEL_MODEL_MAP[process.env.DISCORD_CHANNEL_ID4] = { provider: 'gemini', name: process.env.GOOGLE_GEMINI_MODEL };
 }
 
-// 使用者特定狀態管理
-const userSessions = new Map(); // 儲存對話歷史: userId -> [{ role, content }, ...]
-const userStyles = new Map();   // 儲存使用者風格: userId -> styleString
-const userModels = new Map();   // 儲存使用者選擇的模型: userId -> { provider, name }
+// 使用者特定狀態管理 - 關鍵修改：改為巢狀 Map，以支援每個頻道獨立設定
+// outer Map key: channelId, inner Map key: userId
+const userSessionsByChannel = new Map(); // 儲存對話歷史: channelId -> (userId -> [{ role, content }, ...])
+const userStylesByChannel = new Map();   // 儲存使用者風格: channelId -> (userId -> styleString)
+const userModelsByChannel = new Map();   // 儲存使用者選擇的模型: channelId -> (userId -> { provider, name })
 
 // --- 輔助函式 ---
 
 /**
- * 獲取給定使用者的系統提示詞。
- * 如果使用者設定了個人風格，則返回帶有風格的提示詞；否則返回預設提示詞。
+ * 輔助函式：取得特定頻道的子 Map。如果不存在則會自動建立。
+ * 這讓多頻道獨立設定的存取更方便。
+ * @param {Map<string, Map<string, any>>} parentMap - 外層的 Map (例如 userStylesByChannel)。
+ * @param {string} channelId - Discord 頻道的 ID。
+ * @returns {Map<string, any>} - 該頻道的子 Map。
+ */
+function getChannelMap(parentMap, channelId) {
+    if (!parentMap.has(channelId)) {
+        parentMap.set(channelId, new Map());
+    }
+    return parentMap.get(channelId);
+}
+
+/**
+ * 獲取給定使用者在特定頻道的系統提示詞。
+ * 如果使用者在此頻道設定了個人風格，則返回帶有風格的提示詞；否則返回預設提示詞。
  * @param {string} userId - 使用者的 Discord ID。
+ * @param {string} channelId - 訊息所在頻道的 Discord ID。
  * @returns {string} - 系統提示詞。
  */
-function getSystemPrompt(userId) {
-    const style = userStyles.get(userId);
+function getSystemPrompt(userId, channelId) {
+    // 從該頻道的風格 Map 中取得使用者風格
+    const channelStyles = getChannelMap(userStylesByChannel, channelId);
+    const style = channelStyles.get(userId);
     return style ? `你是一個具備「${style}」風格的聊天助手，請用這種語氣回答使用者問題。` : DEFAULT_PERSONA;
 }
 
 /**
  * 獲取給定使用者和頻道應使用的模型資訊。
- * 優先考慮使用者透過 `/切換模型` 指令選擇的模型，其次是頻道的預設模型。
+ * 優先考慮使用者透過 `/切換模型` 指令為此頻道選擇的模型，其次是頻道的預設模型。
  * @param {string} userId - 使用者的 Discord ID。
  * @param {string} channelId - 訊息所在頻道的 Discord ID。
  * @returns {{provider: string, name: string} | undefined} - 模型提供者和名稱的物件，如果沒有設定則為 undefined。
  */
 function getUserModel(userId, channelId) {
-    const userChoice = userModels.get(userId);
+    // 從該頻道的模型 Map 中取得使用者模型
+    const channelUserModels = getChannelMap(userModelsByChannel, channelId);
+    const userChoice = channelUserModels.get(userId);
     if (userChoice && typeof userChoice === 'object' && userChoice.provider && userChoice.name) {
         return userChoice;
     }
-    return CHANNEL_MODEL_MAP[channelId];
+    return CHANNEL_MODEL_MAP[channelId]; // 否則返回頻道的預設模型
 }
 
 /**
@@ -79,7 +101,7 @@ async function urlToGenerativePart(url, mimeType) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText}`);
+            throw new Error(`Failed to fetch image: ${response.statusText} (Status: ${response.status})`);
         }
         const arrayBuffer = await response.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
@@ -115,22 +137,32 @@ const slashCommands = [
 // --- 指令處理器 ---
 
 /**
- * 處理 `/風格` 指令，設定使用者聊天風格。
+ * 處理 `/風格` 指令，設定使用者在**當前頻道**的聊天風格。
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - Discord 互動物件。
  */
 async function handleSetStyle(interaction) {
     const style = interaction.options.getString('內容');
-    userStyles.set(interaction.user.id, style);
-    return interaction.reply(`✅ 已為你設定風格為「${style}」。`);
+    const userId = interaction.user.id;
+    const channelId = interaction.channel.id; // 取得頻道 ID
+
+    // 取得或建立該頻道的風格 Map，然後設定此使用者在此頻道的風格
+    const channelStyles = getChannelMap(userStylesByChannel, channelId);
+    channelStyles.set(userId, style);
+    return interaction.reply(`✅ 已為你在**本頻道**設定風格為「${style}」。`);
 }
 
 /**
- * 處理 `/正常風格` 指令，清除使用者自訂風格設定。
+ * 處理 `/正常風格` 指令，清除使用者在**當前頻道**的自訂風格設定。
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - Discord 互動物件。
  */
 async function handleResetStyle(interaction) {
-    userStyles.delete(interaction.user.id);
-    return interaction.reply('🧑‍💻 已恢復正常的說話風格。');
+    const userId = interaction.user.id;
+    const channelId = interaction.channel.id;
+
+    // 從該頻道的風格 Map 中清除此使用者風格
+    const channelStyles = getChannelMap(userStylesByChannel, channelId);
+    channelStyles.delete(userId);
+    return interaction.reply('🧑‍💻 已在**本頻道**恢復正常的說話風格。');
 }
 
 /**
@@ -143,6 +175,7 @@ async function handleTranslate(interaction) {
     const text = interaction.options.getString('文字');
     const targetLang = interaction.options.getString('目標語言') || '台灣繁體中文';
 
+    // 獲取使用者在當前頻道應使用的模型資訊
     const currentModelInfo = getUserModel(userId, channelId);
 
     // 斜線指令可以在任何頻道使用，但模型翻譯仍需依賴模型設定
@@ -183,17 +216,16 @@ async function handleTranslate(interaction) {
 }
 
 /**
- * 處理 `/切換模型` 指令，讓使用者選擇不同的 AI 模型。
- * 使用者現在透過選單選擇模型，而不是手動輸入。
+ * 處理 `/切換模型` 指令，讓使用者選擇不同的 AI 模型，**只針對當前頻道生效**。
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - Discord 互動物件。
  */
 async function handleSwitchModel(interaction) {
     const userId = interaction.user.id;
+    const channelId = interaction.channel.id; // 取得頻道 ID
     // 直接取得選項的值，這個值已經是 'provider/name' 格式
     const modelValue = interaction.options.getString('模型');
     const parts = modelValue.split('/');
 
-    // 由於模型是從預定義的列表選擇的，這裡的驗證會更簡單，但也保留了防禦性檢查。
     if (parts.length === 2 && (parts[0] === 'openai' || parts[0] === 'gemini') && parts[1]) {
         const provider = parts[0];
         const name = parts[1];
@@ -203,10 +235,12 @@ async function handleSwitchModel(interaction) {
             return interaction.reply({ content: '❌ Gemini API Key 未設定或初始化失敗，無法切換至 Gemini 模型。', ephemeral: true });
         }
 
-        userModels.set(userId, { provider, name });
+        // 取得或建立該頻道的模型 Map，然後設定此使用者在此頻道的模型
+        const channelUserModels = getChannelMap(userModelsByChannel, channelId);
+        channelUserModels.set(userId, { provider, name });
         // 查找使用者選擇的模型的顯示名稱，用於回覆訊息，提升使用者體驗
         const selectedModelDisplayName = AVAILABLE_MODELS.find(m => m.value === modelValue)?.name || modelValue;
-        return interaction.reply(`✅ 模型已為你切換為 **${selectedModelDisplayName}**。`);
+        return interaction.reply(`✅ 模型已為你在**本頻道**切換為 **${selectedModelDisplayName}**。`);
     } else {
         // 理論上，如果選項是預定義的，這個錯誤訊息不應該觸發。
         // 這作為一個防禦性編程措施，以防未來有其他非預期值傳入。
@@ -215,28 +249,36 @@ async function handleSwitchModel(interaction) {
 }
 
 /**
- * 處理 `/預設模型` 指令，將使用者使用的模型恢復為頻道的預設模型。
+ * 處理 `/預設模型` 指令，將使用者使用的模型恢復為**當前頻道**的預設模型。
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - Discord 互動物件。
  */
 async function handleDefaultModel(interaction) {
     const userId = interaction.user.id;
     const channelId = interaction.channel.id;
-    userModels.delete(userId); // 清除使用者個人模型設定
+
+    // 從該頻道的模型 Map 中清除此使用者模型設定
+    const channelUserModels = getChannelMap(userModelsByChannel, channelId);
+    channelUserModels.delete(userId); // 清除使用者個人模型設定
     const defaultModel = CHANNEL_MODEL_MAP[channelId]; // 獲取頻道的預設模型資訊
     if (defaultModel) {
-        return interaction.reply(`✅ 已為你切換回此頻道的預設模型：${defaultModel.provider}/${defaultModel.name}。`);
+        return interaction.reply(`✅ 已為你在**本頻道**切換回此頻道的預設模型：${defaultModel.provider}/${defaultModel.name}。`);
     } else {
         return interaction.reply('✅ 你的個人模型設定已清除。此頻道未配置預設模型。');
     }
 }
 
 /**
- * 處理 `/重設` 指令，清除使用者當前的對話上下文。
+ * 處理 `/重設` 指令，清除使用者在**當前頻道**的對話上下文。
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - Discord 互動物件。
  */
 async function handleResetConversation(interaction) {
-    userSessions.delete(interaction.user.id); // 清除該使用者的對話歷史
-    return interaction.reply('🧹 上下文對話已為你重設。');
+    const userId = interaction.user.id;
+    const channelId = interaction.channel.id;
+
+    // 從該頻道的對話歷史 Map 中清除此使用者的對話歷史
+    const channelSessions = getChannelMap(userSessionsByChannel, channelId);
+    channelSessions.delete(userId);
+    return interaction.reply('🧹 **本頻道**上下文對話已為你重設。');
 }
 
 // 將斜線指令名稱映射到對應的處理器函式
@@ -244,7 +286,7 @@ const slashCommandHandlers = {
     '風格': handleSetStyle,
     '正常風格': handleResetStyle,
     '翻譯': handleTranslate,
-    '切換模型': handleSwitchModel, // 確保這裡指向更新後的函式
+    '切換模型': handleSwitchModel,
     '預設模型': handleDefaultModel,
     '重設': handleResetConversation,
 };
@@ -298,23 +340,20 @@ async function handleMessage(message) {
     const content = message.content.trim();
     const attachment = message.attachments.first(); // 獲取第一個附件
 
-    // *** 關鍵修改部分 START ***
     // 檢查當前頻道是否在 CHANNEL_MODEL_MAP 中有設定
     // 如果不在設定的頻道列表裡，則直接忽略此訊息，不進行任何 AI 處理或回覆。
     if (!CHANNEL_MODEL_MAP[channelId]) {
         // console.log(`頻道 ${channelId} 未設定 AI 模型，忽略訊息。`); // 可以取消註解用於調試
         return; // 直接退出，不處理此頻道的消息
     }
-    // *** 關鍵修改部分 END ***
 
-    const currentModelInfo = getUserModel(userId, channelId); // 獲取當前模型資訊
+    // 獲取使用者在當前頻道應使用的模型資訊
+    const currentModelInfo = getUserModel(userId, channelId); 
 
-    // 檢查是否有有效的模型設定（這段現在只會在已設定的頻道中執行）
     // 如果在已設定的頻道中，但透過 getUserModel 仍未獲取到有效模型 (例如，環境變數配置錯誤)，
     // 則會執行這裡的邏輯。
     if (!currentModelInfo || !currentModelInfo.provider || !currentModelInfo.name) {
         console.error(`在已設定頻道 ${channelId} 中無法確定模型資訊。請檢查環境變數配置。CurrentModelInfo:`, currentModelInfo);
-        // 這裡可以選擇是否給使用者一個錯誤回覆，或者直接靜默處理
         await message.reply("❌ 此頻道已設定為 AI 頻道，但模型配置似乎有誤。請聯繫管理員檢查機器人配置。");
         return;
     }
@@ -325,7 +364,8 @@ async function handleMessage(message) {
         return;
     }
 
-    const systemPrompt = getSystemPrompt(userId); // 獲取系統提示詞
+    // 獲取使用者在當前頻道的系統提示詞
+    const systemPrompt = getSystemPrompt(userId, channelId); 
 
     // 處理帶有圖片附件的訊息
     if (attachment && attachment.contentType?.startsWith("image/")) {
@@ -403,7 +443,7 @@ async function handleImageMessage(message, currentModelInfo, systemPrompt, textC
 /**
  * 處理純文字訊息。
  * 根據當前模型提供者（OpenAI 或 Gemini）呼叫相應的文字生成 API。
- * 管理對話上下文。
+ * 管理對話上下文，**對話歷史在每個頻道是獨立的**。
  * @param {import('discord.js').Message} message - Discord 訊息物件。
  * @param {{provider: string, name: string}} currentModelInfo - 當前使用的模型資訊。
  * @param {string} systemPrompt - 系統提示詞。
@@ -412,10 +452,13 @@ async function handleImageMessage(message, currentModelInfo, systemPrompt, textC
 async function handleTextMessage(message, currentModelInfo, systemPrompt, content) {
     const userId = message.author.id;
     const channelId = message.channel.id;
-    const userContext = userSessions.get(userId) || []; // 獲取使用者對話歷史
+    
+    // 取得或建立該頻道的對話歷史 Map，然後從中獲取使用者在此頻道的對話歷史
+    const channelSessions = getChannelMap(userSessionsByChannel, channelId);
+    const userContext = channelSessions.get(userId) || []; 
 
     userContext.push({ role: 'user', content }); // 添加最新使用者訊息
-    // 限制對話歷史長度，保留最近的 N 條訊息（例如 5 組對話，共 10 條訊息）
+    // 限制對話歷史長度，保留最近的 N 條訊息（例如 5組對話，共 10 條訊息）
     if (userContext.length > CONTEXT_HISTORY_LIMIT) {
         userContext.splice(0, userContext.length - CONTEXT_HISTORY_LIMIT);
     }
@@ -434,56 +477,52 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
                 temperature: 0.7, // 控制生成文本的隨機性
             });
             answer = response.choices[0].message.content;
-        }  else if (currentModelInfo.provider === 'gemini') {
-    const model = genAI.getGenerativeModel({
-        model: currentModelInfo.name,
-        systemInstruction: systemPrompt,
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        ],
-    });
+            } else if (currentModelInfo.provider === 'gemini') {
+            const model = genAI.getGenerativeModel({
+                model: currentModelInfo.name,
+                systemInstruction: systemPrompt,
+                safetySettings: [
+                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+                ],
+            });
 
-    // 關鍵修改：確保歷史的起始角色正確
-    const historyForGemini = [];
-    let foundFirstUser = false; // 標記是否找到第一個使用者訊息
+            // 關鍵修改：為 Gemini 構建正確的對話歷史格式，確保第一條是 'user'
+            const historyForGemini = [];
+            // 只將對話歷史中除了最新一條「user」訊息以外的內容加入歷史
+            // Gemini 的 chat.sendMessage() 會處理當前這一條使用者訊息
+            
+            // 複製一份 userContext，避免直接修改原始陣列用於後續判斷
+            const tempUserContext = [...userContext]; 
+            // 獲取當前使用者發送的最新訊息內容，並從臨時歷史中移除
+            const currentMessageContent = tempUserContext.pop().content; 
 
-    // 遍歷 userContext，從第一個 user 訊息開始構建歷史
-    for (const msg of userContext) {
-        // 如果還沒有找到第一個 'user' 訊息，並且當前訊息是 'model'，則跳過
-        if (!foundFirstUser && msg.role === 'assistant') { // 注意：你的 assistant 角色在 Gemini 裡會變成 model
-            continue;
+            // 調整歷史紀錄，確保第一條是 'user'
+            // 循環移除開頭為 'assistant' (在 Gemini 中為 'model') 的訊息，直到第一條是 'user'
+            while (tempUserContext.length > 0 && tempUserContext[0].role === 'assistant') {
+                tempUserContext.shift(); // 移除最舊的訊息
+            }
+
+            // 將處理過後的歷史紀錄轉換為 Gemini 期望的格式
+            for (const msg of tempUserContext) {
+                historyForGemini.push({
+                    role: msg.role === 'assistant' ? 'model' : 'user', // 將 OpenAI 的 'assistant' 轉換為 Gemini 的 'model'
+                    parts: [{ text: msg.content }],
+                });
+            }
+            
+            // Debugging 輸出，可以幫助您檢查歷史內容
+            // console.log("Gemini History being sent:", JSON.stringify(historyForGemini, null, 2));
+
+
+            const chat = model.startChat({ history: historyForGemini }); // 使用修正後的歷史
+            const result = await chat.sendMessage(currentMessageContent); // 發送最新使用者訊息
+            answer = result.response.text();
         }
-        // 找到第一個 'user' 訊息後，或者已經開始添加訊息後，就開始添加
-        if (msg.role === 'user') {
-            foundFirstUser = true;
-        }
-        
-        // 將訊息添加到歷史中，並轉換角色
-        historyForGemini.push({
-            role: msg.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: msg.content }],
-        });
-    }
-
-    // 處理當前使用者訊息 (userContext 中的最後一條)
-    // 如果 historyForGemini 中包含當前使用者訊息，則移除它，因為 sendMessage 處理它
-    let currentMessageForSend = '';
-    if (historyForGemini.length > 0 && historyForGemini[historyForGemini.length - 1].role === 'user') {
-        currentMessageForSend = historyForGemini.pop().parts[0].text; // 移除並獲取最後一條使用者訊息
-    } else {
-        // 這應該不會發生，因為 userContext.push({ role: 'user', content }); 總會把當前訊息加進去
-        currentMessageForSend = content; // 或者直接使用傳入的 content
-    }
-
-
-    const chat = model.startChat({ history: historyForGemini }); // 使用修正後的歷史
-    const result = await chat.sendMessage(currentMessageForSend); // 發送最新使用者訊息
-    answer = result.response.text();
-}
 
         userContext.push({ role: 'assistant', content: answer }); // 將 AI 回覆添加到對話歷史
-        userSessions.set(userId, userContext); // 更新使用者對話歷史
+        // 更新使用者在此頻道的對話歷史
+        channelSessions.set(userId, userContext); 
 
         if (thinkingMessage) await thinkingMessage.delete(); // 刪除「思考中」訊息
 
@@ -495,29 +534,29 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
             currentModelInfo.provider === defaultChannelModel.provider &&
             currentModelInfo.name === defaultChannelModel.name) {
             replyHeader = `💬 回覆 (${defaultChannelModel.provider}/${defaultChannelModel.name})：`;
-      }
-      // 分段傳送，單段最多1950字元
-      const DISCORD_LIMIT = 1950;
-      const header = `${replyHeader}\n`;
-      let answerText = answer;
-      let chunks = [];
-
-      if (header.length + answerText.length <= DISCORD_LIMIT) {
-        chunks.push(header + answerText);
-      } else {
-        let currIndex = 0;
-        let firstChunkBodyLength = DISCORD_LIMIT - header.length;
-        chunks.push(header + answerText.slice(0, firstChunkBodyLength));
-        currIndex += firstChunkBodyLength;
-        while (currIndex < answerText.length) {
-          chunks.push(answerText.slice(currIndex, currIndex + DISCORD_LIMIT));
-          currIndex += DISCORD_LIMIT;
         }
-      }
+        // 分段傳送，單段最多1950字元
+        const DISCORD_LIMIT = 1950;
+        const header = `${replyHeader}\n`;
+        let answerText = answer;
+        let chunks = [];
 
-      for (const chunk of chunks) {
-        await message.channel.send(chunk);
-      }
+        if (header.length + answerText.length <= DISCORD_LIMIT) {
+            chunks.push(header + answerText);
+        } else {
+            let currIndex = 0;
+            let firstChunkBodyLength = DISCORD_LIMIT - header.length;
+            chunks.push(header + answerText.slice(0, firstChunkBodyLength));
+            currIndex += firstChunkBodyLength;
+            while (currIndex < answerText.length) {
+                chunks.push(answerText.slice(currIndex, currIndex + DISCORD_LIMIT));
+                currIndex += DISCORD_LIMIT;
+            }
+        }
+
+        for (const chunk of chunks) {
+            await message.channel.send(chunk);
+        }
 
     } catch (error) {
         console.error(`處理 ${currentModelInfo.provider} API 時發生錯誤:`, error);
