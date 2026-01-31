@@ -126,3 +126,10 @@ F-C0032-001(原)>>F-D0047-091(新)
 [1.7.1]
 1.修正gemini常回應錯誤問題。
 2.autoReplyWithGPT.js翻譯功能預設語言由中文改為台灣繁體中文
+
+2025/6/14
+[1.7.2]
+1.修正為切換模型和切換風格功能只在輸入指令得頻道觸發
+
+1.autoReplyWithGPT.js的temperature設為1，以支援GPT-5
+2.models.js加入gpt5系列及gemini-2.5-pro
