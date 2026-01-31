@@ -9,14 +9,15 @@
  * 你可以在這裡輕鬆地添加、修改或刪除模型，而無需觸及主要邏輯檔案。
  */
 const AVAILABLE_MODELS = [
-    { name: 'OpenAI GPT-5', value: 'openai/gpt-5' },
-    { name: 'OpenAI GPT-5-mini', value: 'openai/gpt-5-mini' },
-    { name: 'OpenAI GPT-5-nano', value: 'openai/gpt-5-nano' },
-    { name: 'OpenAI GPT-5.1', value: 'openai/gpt-5.1' },
-    { name: 'Gemini 3 Flash', value: 'gemini/gemini-3-flash-preview' },
-    { name: 'Gemini 2.5 Flash', value: 'gemini/gemini-2.5-flash' },
-    { name: 'Gemini 2.5 Flash Lite', value: 'gemini/gemini-2.5-flash-lite' },
-    { name: 'Gemini 2.5 Pro', value: 'gemini/gemini-2.5-pro' },
+    { name: 'OpenAI GPT-4o', value: 'openai/gpt-4o' },
+    { name: 'OpenAI GPT-4o-mini', value: 'openai/gpt-4o-mini' },
+    { name: 'OpenAI GPT-4.1', value: 'openai/gpt-4.1' },
+    { name: 'OpenAI GPT-4.1-mini', value: 'openai/gpt-4.1-mini' },
+    { name: 'OpenAI GPT-4.1-nano', value: 'openai/gpt-4.1-nano' },
+    { name: 'Gemini 2.5 Flash', value: 'gemini/gemini-2.5-flash-preview-05-20' },
+    { name: 'Gemini 2.0 Flash', value: 'gemini/gemini-2.0-flash' },
+    //{ name: 'Gemini 2.0 Flash Image', value: 'gemini/gemini-2.0-flash-preview-image-generation' },
+    // { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro-preview-05-06' },
     // 範例：可以添加更多模型
     // { name: 'OpenAI GPT-4', value: 'openai/gpt-4' },
     // { name: 'Gemini Pro (舊版)', value: 'gemini/gemini-pro' },
