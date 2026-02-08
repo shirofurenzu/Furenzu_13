@@ -1,19 +1,21 @@
+
+const { Events } = require('discord.js');
 const channelId = '1088826285482070207'; 
 const userId = '337612075285086209'; 
 const targetReminders = [
     {
-        time: [08, 30, 00], // 第一個提醒時間
+        time: [8, 30, 0], // 第一個提醒時間
         message: `早安 <@${userId}>!` // 第一個提醒消息
     },
     {
-        time: [23, 30, 00], // 第二個提醒時間
+        time: [23, 30, 0], // 第二個提醒時間
         message: `晚安 <@${userId}>!` // 第二個提醒消息
     }
     // 可添加更多提醒
 ];
 
 function dailyRemind(client) {
-    client.on("ready", () => {
+   client.once(Events.ClientReady, () => {
         targetReminders.forEach((reminder) => {
             const now = new Date();
             const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), ...reminder.time); 
@@ -27,7 +29,7 @@ function dailyRemind(client) {
                     channel.send(reminder.message); // 每24小時發送對應的消息內容
                 }, 24 * 60 * 60 * 1000); // 重新設定24小時循環
             }, delay);
-        });
+            });
         console.log(`dailyRemind 執行中！`);
     });
 }

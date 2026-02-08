@@ -135,3 +135,9 @@ F-C0032-001(原)>>F-D0047-091(新)
 [1.7.3]
 1.autoReplyWithGPT.js的temperature設為1，以支援GPT-5
 2.models.js加入gpt5系列及gemini-2.5-pro
+
+2026/2/8
+[1.7.4]
+1.用 axios 來取代 node-fetch
+2.將 'ready' 改為使用 Events.ClientReady
+(app.js、dailyRemind.js、generateAndSendImage.js)

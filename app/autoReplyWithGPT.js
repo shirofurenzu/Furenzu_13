@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const axios = require('axios');
 // 引入 models.js 檔案中定義的模型列表
 const { AVAILABLE_MODELS } = require('../config/models'); // 路徑已根據你的檔案結構調整
 
@@ -89,22 +90,19 @@ function getUserModel(userId, channelId) {
 
 /**
  * 將遠端圖片 URL 轉換為 GoogleGenerativeAI SDK 所需的 inlineData 部分（Base64 編碼）。
- * 這是為 Gemini 處理圖片所必需的步驟。
+ * 使用 axios 替代 node-fetch 以減少依賴。
  * @param {string} url - 圖片的 URL。
  * @param {string} mimeType - 圖片的 MIME 類型 (例如, 'image/png')。
  * @returns {Promise<{inlineData: {data: string, mimeType: string}}>} - 包含 Base64 編碼圖片資料的物件。
- * @throws {Error} - 如果無法獲取或處理圖片。
  */
 async function urlToGenerativePart(url, mimeType) {
-    // 動態導入 node-fetch，因為它是 ES Module
-    const { default: fetch } = await import('node-fetch');
     try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText} (Status: ${response.status})`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        // 使用 axios 取得圖片資料，設定回應類型為 arraybuffer
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        
+        // 將二進位資料轉為 Base64
+        const base64 = Buffer.from(response.data).toString('base64');
+        
         return { inlineData: { data: base64, mimeType } };
     } catch (error) {
         console.error("將 URL 轉換為 Generative Part 時發生錯誤:", error);

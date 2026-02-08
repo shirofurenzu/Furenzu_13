@@ -1,4 +1,4 @@
-const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder, Events } = require('discord.js');
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } = require('@google/generative-ai'); // 引入 Modality
 const axios = require('axios');
@@ -42,9 +42,8 @@ function detectImageSize(prompt) {
  */
 async function generateAndSendImage(client) {
   if (!client.isReady()) {
-    await new Promise(resolve => client.once('ready', resolve));
+    await new Promise(resolve => client.once(Events.ClientReady, resolve));
   }
-
   // 設定機器人監聽的頻道 ID 及其對應的預設模型
   const channelModelMap = {
     [process.env.DISCORD_CHANNEL_ID3]: 'openai',

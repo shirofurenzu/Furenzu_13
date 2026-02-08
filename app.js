@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events } = require('discord.js'); 
 
 const client = new Client({
   intents: [
@@ -14,10 +14,10 @@ const client = new Client({
 client.login(process.env.DISCORD_BOT_TOKEN);
 //////////////////////////////////////////////////
 /////開機/////
-client.on("ready", () => {
+client.once(Events.ClientReady, c => {
+  console.log(`${c.user.tag} 已上線!`);
   client.user.setPresence({ activities: [{ name: 'Izuna' }], status: 'Online' });
-  console.log(`${client.user.tag}已上線!`);
-  });
+});
   
 /////發言紀錄到終端機/////
 client.on('messageCreate', async (message) => {
@@ -68,7 +68,7 @@ const { registerAllSlashCommands, handleSlashInteractions } = require('./SlashMa
 
 
 /////載入提醒///
-client.once('ready', () => {
+client.once(Events.ClientReady, () => {
 const modules = require('./SlashManager').loadModules();
   for (const mod of modules) {
     if (mod.handleClientReady) mod.handleClientReady(client);
