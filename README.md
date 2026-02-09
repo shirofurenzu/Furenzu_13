@@ -141,3 +141,11 @@ F-C0032-001(原)>>F-D0047-091(新)
 1.用 axios 來取代 node-fetch
 2.將 'ready' 改為使用 Events.ClientReady
 (app.js、dailyRemind.js、generateAndSendImage.js)
+
+2026/2/9
+[1.8.0]
+1.重構dailyRemind及dailyWeather，
+將ID設置移至.env，同時修改index.js
+時間地點設置移至新增的dailyReminders和dailyWeatherTasks
+配合dailyWeather修改app.js的每日氣象
+2.每日提醒新增標記多人功能並改為使用 node-cron 來執行排程。

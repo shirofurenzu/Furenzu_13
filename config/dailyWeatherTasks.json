@@ -1,0 +1,31 @@
+[
+    {
+    "enabled": false,
+    "__comment": "=== 設定檔說明書 ===",
+    "format": "cron 時間格式: [分] [時] [日] [月] [週]",
+    "examples": {
+      "0 7 * * *": "每天早上 7:00",
+      "30 8 * * *": "每天早上 8:30",
+      "0 18 * * 1": "每週一傍晚 18:00",
+      "*/10 * * * *": "每隔 10 分鐘一次"
+    },
+    "types": "詳細預報: detailed_forecast | 簡易降雨機率: simple_pop"
+  },
+  {
+    "enabled": true,
+    "cron": "0 7 * * *",
+    "location": "西屯區",
+    "type": "detailed_forecast",
+    "apiUrl": "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-075",
+    "description": "早上詳細天氣預報"
+  },
+  {
+    "enabled": true,
+    "cron": "0 17 * * *",
+    "location": "臺中市",
+    "type": "simple_pop",
+    "apiUrl": "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001",
+    "popThreshold": 50,
+    "description": "傍晚降雨機率 (設定 popThreshold: 50 代表降雨機率 >= 50% 才發送)"
+  }
+]

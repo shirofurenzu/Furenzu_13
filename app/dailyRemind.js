@@ -1,36 +1,59 @@
-
+const cron = require('node-cron');
 const { Events } = require('discord.js');
-const channelId = '1088826285482070207'; 
-const userId = '337612075285086209'; 
-const targetReminders = [
-    {
-        time: [8, 30, 0], // 第一個提醒時間
-        message: `早安 <@${userId}>!` // 第一個提醒消息
-    },
-    {
-        time: [23, 30, 0], // 第二個提醒時間
-        message: `晚安 <@${userId}>!` // 第二個提醒消息
-    }
-    // 可添加更多提醒
-];
+const config = require('../config/index.js');
+
+// 引入外部的提醒清單 JSON
+let reminderList = [];
+try {
+    reminderList = require('../config/dailyReminders.json');
+} catch (error) {
+    console.error('❌ 無法讀取 config/dailyReminders.json，請檢查檔案是否存在。');
+}
 
 function dailyRemind(client) {
-   client.once(Events.ClientReady, () => {
-        targetReminders.forEach((reminder) => {
-            const now = new Date();
-            const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), ...reminder.time); 
-            let diff = target.getTime() - now.getTime();
-            let delay = diff > 0 ? diff : 86400000 + diff;
+    // 使用 ClientReady 確保機器人已完全啟動
+    client.once(Events.ClientReady, () => {
+        console.log(`📅 每日提醒模組已載入，共 ${reminderList.length} 個排程。`);
 
-            setTimeout(() => {
-                const channel = client.channels.cache.get(channelId);
-                channel.send(reminder.message); // 發送對應的消息內容
-                setInterval(() => {
-                    channel.send(reminder.message); // 每24小時發送對應的消息內容
-                }, 24 * 60 * 60 * 1000); // 重新設定24小時循環
-            }, delay);
+        reminderList.forEach((reminder, index) => {
+            // 檢查是否啟用 (如果有設定 enabled: false 則跳過)
+            if (reminder.enabled === false) return;
+            // 檢查是否有 cron 設定
+            if (!reminder.cron) return;
+
+            // 註冊排程
+            cron.schedule(reminder.cron, () => {
+                try {
+                    // 處理使用者標記
+                    // 支援多個 ID (逗號分隔)
+                    let userTags = '';
+                    if (config.DAILY_REMIND_USER_ID) {
+                        userTags = config.DAILY_REMIND_USER_ID.split(',')
+                            .map(id => `<@${id.trim()}>`)
+                            .join(' ');
+                    }
+
+                    // 替換訊息內容
+                    const finalMessage = reminder.message.replace('{user}', userTags);
+
+                    // 取得頻道並發送
+                    const channel = client.channels.cache.get(config.DAILY_REMIND_CHANNEL_ID);
+                    
+                    if (channel) {
+                        channel.send(finalMessage)
+                            .then(() => console.log(`✅ [提醒] 已發送: ${finalMessage}`))
+                            .catch(e => console.error(`❌ [提醒] 發送失敗: ${e}`));
+                    } else {
+                        console.error(`❌ [提醒] 錯誤: 找不到頻道 ID (${config.DAILY_REMIND_CHANNEL_ID})`);
+                    }
+
+                } catch (error) {
+                    console.error(`❌ [提醒] 執行任務 #${index + 1} 時發生錯誤:`, error);
+                }
             });
-        console.log(`dailyRemind 執行中！`);
+            
+            
+        });
     });
 }
 

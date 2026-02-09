@@ -42,9 +42,8 @@ const { weatherTw } = require('./app/weatherTw.js');
 weatherTw(client);
 
 /////每日氣象/////
-const { dailyWeather, dailyWeatherPoP } = require('./app/dailyWeather.js'); 
-dailyWeather(client);
-dailyWeatherPoP(client);
+const dailyWeather = require('./app/dailyWeather');
+dailyWeather.initDailyWeather(client);
 
 /////設置每日提醒/////
 const {dailyRemind} = require('./app/dailyRemind.js'); 
