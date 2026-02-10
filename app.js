@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////
 require('dotenv').config();
 const { Client, GatewayIntentBits, Partials, Events } = require('discord.js'); 
-
+const config = require('./config/index.js'); 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -43,11 +43,21 @@ weatherTw(client);
 
 /////每日氣象/////
 const dailyWeather = require('./app/dailyWeather');
-dailyWeather.initDailyWeather(client);
+if (config.ENABLE_DAILY_WEATHER) {
+    dailyWeather.initDailyWeather(client); 
+    console.log('✅ [模組] 每日天氣已啟用');
+} else {
+    console.log('⛔ [模組] 每日天氣已停用');
+}
 
 /////設置每日提醒/////
-const {dailyRemind} = require('./app/dailyRemind.js'); 
-dailyRemind(client);
+const dailyRemind = require('./app/dailyRemind');
+if (config.ENABLE_DAILY_REMIND) {
+    dailyRemind.dailyRemind(client);
+    console.log('✅ [模組] 每日提醒已啟用');
+} else {
+    console.log('⛔ [模組] 每日提醒已停用');
+}
 
 /////圖片生成/////
 const { generateAndSendImage } = require('./app/generateAndSendImage.js');

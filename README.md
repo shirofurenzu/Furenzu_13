@@ -149,3 +149,10 @@ F-C0032-001(原)>>F-D0047-091(新)
 時間地點設置移至新增的dailyReminders和dailyWeatherTasks
 配合dailyWeather修改app.js的每日氣象
 2.每日提醒新增標記多人功能並改為使用 node-cron 來執行排程。
+
+2026/2/10
+[1.9.0]
+1.新增每日提醒及每日天氣開關功能，可於.env設置
+修改了index.js及app.js
+2.優化dailyWeather並使用同一API網址
+3.dailyRemind加入隨機抽選語句

@@ -3,7 +3,6 @@ const axios = require('axios');
 const path = require('path');
 const { Events } = require('discord.js');
 const config = require('../config/index.js');
-const weatherTw = require('./weatherTw');
 
 // 引入外部的天氣排程清單 JSON
 let weatherTasks = [];
@@ -19,10 +18,8 @@ function initDailyWeather(client) {
         console.log(`🌦️ 每日天氣模組已載入，共 ${weatherTasks.length} 個排程。`);
 
         weatherTasks.forEach((task, index) => {
-            // 檢查是否啟用
             if (!task.enabled) return;
 
-            // 設定排程
             cron.schedule(task.cron, async () => {
                 try {
                     console.log(`執行天氣任務 #${index + 1}: [${task.type}] ${task.location}`);
@@ -33,11 +30,17 @@ function initDailyWeather(client) {
                         return;
                     }
 
-                    // 根據類型執行不同的邏輯
+                    // 統一使用共用的抓取與解析邏輯
+                    const locationData = await fetchLocationData(task);
+                    if (!locationData) return; // 如果抓不到資料就中止
+
+                    const weather = parseWeatherData(locationData);
+
+                    // 根據類型發送不同訊息
                     if (task.type === 'detailed_forecast') {
-                        await sendDetailedForecast(channel, task);
+                        await sendDetailedMessage(channel, task, locationData, weather);
                     } else if (task.type === 'simple_pop') {
-                        await sendSimplePoP(channel, task);
+                        await sendSimpleMessage(channel, task, weather);
                     }
 
                 } catch (error) {
@@ -48,62 +51,130 @@ function initDailyWeather(client) {
     });
 }
 
-// 邏輯 1: 詳細天氣預報 (對應原本的 dailyWeather)
-// 使用 API: F-D0047-075 (鄉鎮天氣預報-未來2天天氣預報)
-async function sendDetailedForecast(channel, task) {
+// === 共用函式 1: 抓取並尋找地點資料 (F-D0047-075 結構) ===
+async function fetchLocationData(task) {
     const apiUrl = `${task.apiUrl}?Authorization=${process.env.CWB_API_KEY}`;
     const { data } = await axios.get(apiUrl);
     
-    const locationData = data.records.Locations[0].Location.find(l => l.LocationName === task.location);
+    // 兼容 cwaopendata (OpenData) 與 records (REST API) 格式
+    let locations = null;
+    if (data.cwaopendata && data.cwaopendata.Dataset && data.cwaopendata.Dataset.Locations && data.cwaopendata.Dataset.Locations.Location) {
+            locations = data.cwaopendata.Dataset.Locations.Location;
+    } else if (data.records && data.records.Locations && data.records.Locations[0] && data.records.Locations[0].Location) {
+            locations = data.records.Locations[0].Location;
+    } else if (data.records && data.records.locations && data.records.locations[0] && data.records.locations[0].location) { 
+            locations = data.records.locations[0].location;
+    }
     
-    if (!locationData) {
-        console.error(`❌ 找不到地點: ${task.location} (請確認 API 是否支援該行政區)`);
-        return;
+    if (!locations) {
+        console.error('❌ API 回傳資料結構異常，找不到 Locations 欄位。');
+        return null;
     }
 
-    // 使用 weatherTw 模組進行格式化
-    const formattedMsg = weatherTw.filterWeatherData(locationData);
-    channel.send(formattedMsg);
+    const locationData = locations.find(l => (l.LocationName || l.locationName) === task.location);
+    
+    if (!locationData) {
+        console.error(`❌ 找不到地點: ${task.location} (請確認該 API 是否包含此行政區/縣市)`);
+        return null;
+    }
+
+    return locationData;
 }
 
-// 邏輯 2: 簡易降雨機率 (對應原本的 dailyWeatherPoP)
-// 使用 API: F-C0032-001 (一般天氣預報-今明36小時天氣預報)
-async function sendSimplePoP(channel, task) {
-    const apiUrl = `${task.apiUrl}?Authorization=${process.env.CWB_API_KEY}`;
-    const { data } = await axios.get(apiUrl);
+// === 共用函式 2: 解析天氣因子 (回傳乾淨的物件) ===
+function parseWeatherData(locationData) {
+    const weatherElements = locationData.WeatherElement || locationData.weatherElement || [];
     
-    const locationData = data.records.location.find(l => l.locationName === task.location);
+    const result = {
+        wx: '未知',
+        pop: '0',
+        minT: '?',
+        maxT: '?',
+        minAT: '?',
+        maxAT: '?',
+        minCIDesc: '', 
+        maxCIDesc: '',
+        ci: ''
+    };
 
-    if (!locationData) {
-        console.error(`❌ 找不到縣市: ${task.location} (API F-C0032-001 僅支援縣市層級)`);
-        return;
+    weatherElements.forEach(el => {
+        const name = el.ElementName || el.elementName;
+        const timeArray = el.Time || el.time;
+        if (!timeArray || timeArray.length === 0) return;
+
+        let valContainer = timeArray[0].ElementValue || timeArray[0].elementValue;
+        if (Array.isArray(valContainer)) valContainer = valContainer[0];
+        if (!valContainer) return;
+
+        let value = valContainer.value || valContainer.parameterName || valContainer.Weather;
+        if (value === undefined && typeof valContainer === 'object') {
+             const keys = Object.keys(valContainer);
+             if (keys.length > 0) value = valContainer[keys[0]];
+        }
+
+        // 1. 天氣現象
+        if (name === '天氣現象') result.wx = valContainer.Weather || value;
+        // 2. 降雨機率
+        if (name === '12小時降雨機率') result.pop = value;
+        // 3. 溫度
+        if (name === '最低溫度') result.minT = value;
+        if (name === '最高溫度') result.maxT = value;
+        // 4. 體感溫度
+        if (name === '最低體感溫度') result.minAT = value;
+        if (name === '最高體感溫度') result.maxAT = value;
+        // 5. 舒適度
+        if (name === '最小舒適度指數' || name === '最小舒適度指數說明') {
+             result.minCIDesc = valContainer.MinComfortIndexDescription || valContainer.ComfortIndexDescription || value;
+        }
+        if (name === '最大舒適度指數' || name === '最大舒適度指數說明') {
+             result.maxCIDesc = valContainer.MaxComfortIndexDescription || valContainer.ComfortIndexDescription || value;
+        }
+    });
+
+    // 舒適度組裝
+    if (result.minCIDesc && result.maxCIDesc) {
+        result.ci = (result.minCIDesc === result.maxCIDesc) ? result.minCIDesc : `${result.minCIDesc} 至 ${result.maxCIDesc}`;
+    } else if (result.minCIDesc) {
+        result.ci = result.minCIDesc;
+    } else if (result.maxCIDesc) {
+        result.ci = result.maxCIDesc;
     }
 
-    const weatherElements = locationData.weatherElement.reduce((acc, curr) => {
-        acc[curr.elementName] = curr.time[0].parameter;
-        return acc;
-    }, {});
+    return result;
+}
 
-    const pop = weatherElements.PoP.parameterName; // 降雨機率字串，例如 "20"
-    const minT = weatherElements.MinT.parameterName; // 最低溫
-    const maxT = weatherElements.MaxT.parameterName; // 最高溫
-    const ci = weatherElements.CI.parameterName; // 舒適度
+// 邏輯 1: 發送詳細預報訊息
+async function sendDetailedMessage(channel, task, locationData, weather) {
+    const locationName = locationData.LocationName || locationData.locationName;
+    console.log(`✅ [詳細] 成功取得資料: ${locationName}`);
 
-    // === 新增判斷邏輯 ===
-    // 如果設定檔有設定 popThreshold (降雨機率門檻)
+    const msg = `早安！☀️\n**${locationName}** 今日天氣預報：\n` +
+           `☁️ 天氣現象：**${weather.wx}**\n` +
+           `🌡️ 氣溫：**${weather.minT}°C - ${weather.maxT}°C**\n` +
+           `🌡️ 體感：**${weather.minAT}°C - ${weather.maxAT}°C**\n` +
+           `☔ 降雨機率：**${weather.pop}%**\n` +
+           `👕 舒適度：${weather.ci}`;
+    
+    channel.send(msg);
+}
+
+// 邏輯 2: 發送簡易降雨機率訊息
+async function sendSimpleMessage(channel, task, weather) {
+    console.log(`✅ [簡易] 成功取得資料: ${task.location}`);
+
+    // 檢查降雨機率門檻
     if (task.popThreshold !== undefined) {
-        const popValue = parseInt(pop, 10);
-        
-        // 檢查：如果目前降雨機率 < 設定門檻，就不發送
+        const popValue = parseInt(weather.pop, 10);
         if (!isNaN(popValue) && popValue < task.popThreshold) {
             console.log(`☔ [跳過通知] ${task.location} 降雨機率 ${popValue}% 未達設定門檻 (${task.popThreshold}%)。`);
-            return; // 直接結束函式，不執行下面的 channel.send
+            return; 
         }
     }
 
-    const message = `晚安！\n明天 ${task.location} 的降雨機率是 **${pop}%** ☔\n氣溫約 **${minT}°C - ${maxT}°C**，${ci}。`;
+    // 簡易版訊息
+    const msg = `晚安！\n今晚 ${task.location} 的降雨機率是 **${weather.pop}%** ☔\n氣溫約 **${weather.minT}°C - ${weather.maxT}°C**，${weather.ci}。`;
     
-    channel.send(message);
+    channel.send(msg);
 }
 
 module.exports = {

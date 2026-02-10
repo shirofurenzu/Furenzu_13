@@ -1,15 +1,18 @@
 [
-    {
+  {
     "enabled": false,
     "__comment": "=== 設定檔說明書 ===",
     "format": "cron 時間格式: [分] [時] [日] [月] [週]",
-    "examples": {
-      "0 7 * * *": "每天早上 7:00",
-      "30 8 * * *": "每天早上 8:30",
-      "0 18 * * 1": "每週一傍晚 18:00",
-      "*/10 * * * *": "每隔 10 分鐘一次"
-    },
-    "types": "詳細預報: detailed_forecast | 簡易降雨機率: simple_pop"
+    "types": "detailed_forecast (詳細) | simple_pop (簡易降雨機率)",
+    "usage": "請將 apiUrl 中的最後三碼數字換成對應縣市的代碼，location 需填寫該縣市內的行政區 (如: 信義區)",
+    "city_codes_map": {
+      "063": "臺北市", "071": "新北市", "051": "基隆市", "007": "桃園市",
+      "055": "新竹市", "011": "新竹縣", "015": "苗栗縣", "075": "臺中市",
+      "019": "彰化縣", "023": "南投縣", "027": "雲林縣", "059": "嘉義市",
+      "031": "嘉義縣", "079": "臺南市", "067": "高雄市", "035": "屏東縣",
+      "003": "宜蘭縣", "043": "花蓮縣", "039": "臺東縣", "047": "澎湖縣",
+      "087": "金門縣", "083": "連江縣"
+    }
   },
   {
     "enabled": true,
@@ -17,14 +20,14 @@
     "location": "西屯區",
     "type": "detailed_forecast",
     "apiUrl": "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-075",
-    "description": "早上詳細天氣預報"
+    "description": "早上詳細天氣預報 (F-D0047-075 為臺中市)"
   },
   {
     "enabled": true,
     "cron": "0 17 * * *",
-    "location": "臺中市",
+    "location": "西屯區",
     "type": "simple_pop",
-    "apiUrl": "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001",
+    "apiUrl": "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-075",
     "popThreshold": 50,
     "description": "傍晚降雨機率 (設定 popThreshold: 50 代表降雨機率 >= 50% 才發送)"
   }

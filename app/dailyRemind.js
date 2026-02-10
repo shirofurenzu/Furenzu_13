@@ -33,8 +33,19 @@ function dailyRemind(client) {
                             .join(' ');
                     }
 
+                    // === 隨機訊息處理邏輯 ===
+                    let selectedMessage = '';
+                    if (Array.isArray(reminder.message)) {
+                        // 如果是陣列，隨機抽選一句
+                        const randomIndex = Math.floor(Math.random() * reminder.message.length);
+                        selectedMessage = reminder.message[randomIndex];
+                    } else {
+                        // 如果是單一字串，直接使用
+                        selectedMessage = reminder.message;
+                    }
+
                     // 替換訊息內容
-                    const finalMessage = reminder.message.replace('{user}', userTags);
+                    const finalMessage = selectedMessage.replace('{user}', userTags);
 
                     // 取得頻道並發送
                     const channel = client.channels.cache.get(config.DAILY_REMIND_CHANNEL_ID);
