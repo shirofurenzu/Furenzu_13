@@ -12,7 +12,7 @@ const openai = new OpenAI({
 });
 
 // 初始化 Google Gemini 客戶端
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY_Paid);
 const geminiImageModel = genAI.getGenerativeModel({ model: process.env.GOOGLE_GEMINI_IMAGE_MODEL });
 
 /**

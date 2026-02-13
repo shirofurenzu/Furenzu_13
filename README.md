@@ -156,3 +156,7 @@ F-C0032-001(原)>>F-D0047-091(新)
 修改了index.js及app.js
 2.優化dailyWeather並使用同一API網址
 3.dailyRemind加入隨機抽選語句
+
+2026/2/13
+[1.10.0]
+1.gemini圖片生成API改為付費，generateAndSendImage.js獨立使用付費gemini key
