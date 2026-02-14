@@ -1,19 +1,17 @@
 const { EmbedBuilder, AttachmentBuilder, Events } = require('discord.js');
 const { OpenAI } = require('openai');
-const { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } = require('@google/generative-ai'); // 引入 Modality
+const { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } = require('@google/generative-ai');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+const config = require('../config/aiBotConfig'); 
 
 // 初始化 OpenAI 客戶端
 const openai = new OpenAI({
-  apiKey: process.env.OPEN_AI_API_KEY,
+  apiKey: config.openai.apiKey,
 });
 
-// 初始化 Google Gemini 客戶端
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY_Paid);
-const geminiImageModel = genAI.getGenerativeModel({ model: process.env.GOOGLE_GEMINI_IMAGE_MODEL });
+// 初始化 Google Gemini 客戶端 (使用付費 Key 用於圖片生成)
+const genAI = new GoogleGenerativeAI(config.gemini.apiKeyPaid);
+const geminiImageModel = genAI.getGenerativeModel({ model: config.gemini.imageModel });
 
 /**
  * 清理圖片生成指令，移除尺寸關鍵字。
@@ -30,30 +28,28 @@ function cleanPrompt(rawPrompt) {
  * @returns {string} 對應的圖片尺寸。
  */
 function detectImageSize(prompt) {
-  if (prompt.includes('直圖')) return process.env.VERTICAL_IMAGE_SIZE;
-  if (prompt.includes('橫圖')) return process.env.HORIZONTAL_IMAGE_SIZE;
-  return process.env.DEFAULT_IMAGE_SIZE;
+  if (prompt.includes('直圖')) return config.openai.imageSize.vertical;
+  if (prompt.includes('橫圖')) return config.openai.imageSize.horizontal;
+  return config.openai.imageSize.default;
 }
 
 /**
  * 生成並發送圖片到 Discord 頻道。
- * 根據頻道 ID 預設使用 OpenAI DALL-E 3 或 Google Gemini 圖片生成。
+ * 根據設定檔中的映射決定使用哪個模型。
  * @param {Client} client Discord 客戶端實例。
  */
 async function generateAndSendImage(client) {
   if (!client.isReady()) {
     await new Promise(resolve => client.once(Events.ClientReady, resolve));
   }
-  // 設定機器人監聽的頻道 ID 及其對應的預設模型
-  const channelModelMap = {
-    [process.env.DISCORD_CHANNEL_ID3]: 'openai',
-    [process.env.DISCORD_CHANNEL_ID5]: 'gemini',
-  };
+  
+  // 使用 config 中的映射
+  const channelModelMap = config.discord.imageChannelMap;
 
   client.on('messageCreate', async (message) => {
-    // 檢查訊息是否來自配置的頻道
+    // 檢查頻道是否在設定中
     const modelToUse = channelModelMap[message.channel.id];
-    if (!modelToUse) return; // 如果不是配置的頻道，則不處理
+    if (!modelToUse) return; 
 
     if (message.author.bot) return;
 
@@ -61,56 +57,41 @@ async function generateAndSendImage(client) {
     if (!rawPrompt) return;
 
     const thinkingMsg = await message.reply('🖌️ 生成圖片中，請稍後...');
-    const prompt = cleanPrompt(rawPrompt); // DALL-E 3 使用清理後的 prompt
+    const prompt = cleanPrompt(rawPrompt);
     let imageUrl = '';
     let generatorName = '';
     let fileName = '';
     let attachment = null;
-    let imageSize = ''; // DALL-E 3 專用尺寸，Gemini 圖片生成不直接支援此參數
-    let geminiResponseText = ''; // 用來儲存 Gemini 回傳的文本部分
+    let imageSize = '';
+    let imageQuality = 'auto'; 
+    let geminiResponseText = '';
 
     try {
       if (modelToUse === 'gemini') {
         // 使用 Google Gemini 生成圖片
-        generatorName = process.env.GOOGLE_GEMINI_IMAGE_MODEL; // 動態讀取模型名稱
+        generatorName = config.gemini.imageModel;
         try {
-          // Gemini 圖片生成不直接支援尺寸參數，將尺寸關鍵字視為描述的一部分
-          const geminiPrompt = rawPrompt; // 使用原始 prompt，因為 cleanPrompt 可能會移除尺寸關鍵字
+          const geminiPrompt = rawPrompt;
 
           const result = await geminiImageModel.generateContent({
-            contents: [{ role: "user", parts: [{ text: geminiPrompt }] }], // 傳入 prompt
-            // 關鍵修改：明確指定回應模態為文本和圖片
+            contents: [{ role: "user", parts: [{ text: geminiPrompt }] }],
             generationConfig: {
-             
-              responseModalities: ["TEXT", "IMAGE"], // 必須指定 TEXT 和 IMAGE
+              responseModalities: ["TEXT", "IMAGE"],
             },
-            safetySettings: [ // 可選：加入安全性設定
-                {
-                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
+            safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             ],
           });
 
           const response = await result.response;
           let imageFound = false;
 
-          // 遍歷所有回傳的部分，查找圖片和文本
           for (const part of response.candidates[0].content.parts) {
             if (part.text) {
-              geminiResponseText = part.text; // 儲存文本部分
+              geminiResponseText = part.text;
             } else if (part.inlineData) {
               const imageData = part.inlineData.data;
               const buffer = Buffer.from(imageData, 'base64');
@@ -126,7 +107,6 @@ async function generateAndSendImage(client) {
 
         } catch (geminiError) {
           console.error('❌ Google Gemini 圖片生成錯誤:', geminiError);
-          // 檢查錯誤訊息是否包含內容被阻擋
           if (geminiError.message && geminiError.message.includes('safety')) {
             await thinkingMsg.edit('❌ Google Gemini 圖片生成失敗：內容可能不符合安全政策，請嘗試其他指令。');
           } else {
@@ -136,25 +116,42 @@ async function generateAndSendImage(client) {
         }
 
       } else if (modelToUse === 'openai') {
-        // 使用 OpenAI DALL-E 3 生成圖片
-        generatorName = process.env.OPEN_AI_IMAGE_MODEL; // 動態讀取模型名稱
-        imageSize = detectImageSize(rawPrompt); // DALL-E 3 專用尺寸
-        const response = await openai.images.generate({
-          model: process.env.OPEN_AI_IMAGE_MODEL,
-          prompt, // 使用清理後的 prompt
+        // 使用 OpenAI 生成圖片
+        generatorName = config.openai.imageModel;
+        imageSize = detectImageSize(rawPrompt);
+        imageQuality = config.openai.imageQuality || 'auto';
+
+        const imageOptions = {
+          model: generatorName,
+          prompt,
           n: 1,
           size: imageSize,
-          response_format: 'url',
-        });
-        imageUrl = response.data[0].url;
+        };
 
-        // 下載圖片
-        const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        const buffer = Buffer.from(imageResponse.data, 'binary');
-        fileName = `openai_image_${Date.now()}.png`;
-        attachment = new AttachmentBuilder(buffer, { name: fileName });
+        if (imageQuality && imageQuality !== 'auto') {
+          imageOptions.quality = imageQuality;
+        }
+
+        const response = await openai.images.generate(imageOptions);
+        
+        const imageObj = response.data && response.data[0];
+        
+        if (imageObj && imageObj.url) {
+          imageUrl = imageObj.url;
+          const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+          const buffer = Buffer.from(imageResponse.data, 'binary');
+          fileName = `openai_image_${Date.now()}.png`;
+          attachment = new AttachmentBuilder(buffer, { name: fileName });
+        } else if (imageObj && imageObj.b64_json) {
+          const buffer = Buffer.from(imageObj.b64_json, 'base64');
+          fileName = `openai_image_${Date.now()}.png`;
+          attachment = new AttachmentBuilder(buffer, { name: fileName });
+        } else {
+          console.error('OpenAI 異常回應:', JSON.stringify(response, null, 2));
+          throw new Error('OpenAI 未回傳有效的圖片 URL 或 Base64 數據');
+        }
+
       } else {
-        // 理論上不會發生，但以防萬一
         await thinkingMsg.edit('❌ 無法判斷圖片生成模型。');
         return;
       }
@@ -172,14 +169,17 @@ async function generateAndSendImage(client) {
         )
         .setFooter({ text: `由 ${generatorName} 自動生成` });
 
-      // 如果 Gemini 回傳了文本，也加到 Embed 中
       if (modelToUse === 'gemini' && geminiResponseText) {
-        embed.addFields({ name: '模型回覆', value: geminiResponseText.substring(0, 1024) }); // 限制長度以防過長
+        embed.addFields({ name: '模型回覆', value: geminiResponseText.substring(0, 1024) });
       }
 
-      // 只有當模型是 OpenAI 且尺寸資訊有意義時才顯示圖片尺寸
-      if (modelToUse === 'openai' && imageSize && imageSize !== 'undefined') {
-        embed.addFields({ name: '圖片尺寸', value: imageSize });
+      if (modelToUse === 'openai') {
+        if (imageSize && imageSize !== 'undefined') {
+          embed.addFields({ name: '圖片尺寸', value: imageSize, inline: true });
+        }
+        if (imageQuality) {
+          embed.addFields({ name: '畫質設定', value: imageQuality, inline: true });
+        }
       }
 
       if (attachment) {
