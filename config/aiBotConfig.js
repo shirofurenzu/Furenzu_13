@@ -34,7 +34,7 @@ const config = {
       }
     ],
 
-    // [圖片頻道] 的模型配置
+    // [圖片頻道] 的預設模型配置 (Fallback)
     imageChannelMap: {
       [process.env.DISCORD_CHANNEL_GPT_IMAGE]: 'openai',
       [process.env.DISCORD_CHANNEL_GEMINI_IMAGE]: 'gemini',
@@ -47,14 +47,14 @@ const config = {
     // Persona 設定
     persona: '你是一個樂於助人的助手，會以繁體中文回答使用者的問題。',
     
-    // 圖片生成設定
+    // 預設圖片生成設定
     imageModel: 'gpt-image-1.5',
     imageQuality: 'low', 
     
     imageSize: {
       default: '1024x1024',
-      vertical: '1024x1792',
-      horizontal: '1792x1024',
+      vertical: '1024x1536',
+      horizontal: '1536x1024',
     }
   },
 
@@ -63,18 +63,29 @@ const config = {
     apiKey: process.env.GEMINI_API_KEY,      // 免費版 Key (Chat)
     apiKeyPaid: process.env.GEMINI_API_KEY_Paid, // 付費版 Key (Image)
     
-    // 圖片生成設定
+    // 預設圖片生成設定
     imageModel: 'gemini-2.5-flash-image',
   },
 
   // 可供使用者選擇的模型列表
+  // 格式：'provider/modelName:quality' (若無 quality 可省略或寫 default)
   availableModels: [
+    // 聊天模型
     { name: 'OpenAI GPT-5.1', value: 'openai/gpt-5.1' },
     { name: 'OpenAI GPT-5-mini', value: 'openai/gpt-5-mini' },
     { name: 'OpenAI GPT-5-nano', value: 'openai/gpt-5-nano' },
     { name: 'Gemini 3 Flash', value: 'gemini/gemini-3-flash-preview' },
     { name: 'Gemini 2.5 Flash', value: 'gemini/gemini-2.5-flash' },
     { name: 'Gemini 2.5 Flash Lite', value: 'gemini/gemini-2.5-flash-lite' },
+    
+    // 繪圖模型 (格式: provider/model:quality)
+    { name: 'GPT Image 1.5 (Low)', value: 'openai/gpt-image-1.5:low' },
+    { name: 'GPT Image 1.5 (Medium)', value: 'openai/gpt-image-1.5:medium' },
+    { name: 'GPT Image 1.5 (High)', value: 'openai/gpt-image-1.5:high' },
+    { name: 'DALL-E 3 (Standard)', value: 'openai/dall-e-3:standard' },
+    { name: 'DALL-E 3 (HD)', value: 'openai/dall-e-3:hd' },
+    { name: 'Gemini 2.5 Flash Image', value: 'gemini/gemini-2.5-flash-image:default' },
+    { name: 'Gemini 3 Pro Image', value: 'gemini/gemini-3-pro-image-preview:default' }
   ]
 };
 

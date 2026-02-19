@@ -148,11 +148,10 @@ async function sendDetailedMessage(channel, task, locationData, weather) {
     const locationName = locationData.LocationName || locationData.locationName;
     console.log(`✅ [詳細] 成功取得資料: ${locationName}`);
 
-    const msg = `早安！☀️\n**${locationName}** 今日天氣預報：\n` +
-           `☁️ 天氣現象：**${weather.wx}**\n` +
-           `🌡️ 氣溫：**${weather.minT}°C - ${weather.maxT}°C**\n` +
-           `🌡️ 體感：**${weather.minAT}°C - ${weather.maxAT}°C**\n` +
-           `☔ 降雨機率：**${weather.pop}%**\n` +
+    const msg = `早安！☀️\n**${locationName}**今日${weather.wx}\n` +
+           `🌡️ 氣溫：${weather.minT}°C - ${weather.maxT}°C\n` +
+           `🌡️ 體感：${weather.minAT}°C - ${weather.maxAT}°C\n` +
+           `☔ 降雨機率：${weather.pop}%\n` +
            `👕 舒適度：${weather.ci}`;
     
     channel.send(msg);

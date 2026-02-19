@@ -1,4 +1,4 @@
-const { EmbedBuilder, AttachmentBuilder, Events } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder, Events, SlashCommandBuilder } = require('discord.js');
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } = require('@google/generative-ai');
 const axios = require('axios');
@@ -11,21 +11,40 @@ const openai = new OpenAI({
 
 // 初始化 Google Gemini 客戶端 (使用付費 Key 用於圖片生成)
 const genAI = new GoogleGenerativeAI(config.gemini.apiKeyPaid);
-const geminiImageModel = genAI.getGenerativeModel({ model: config.gemini.imageModel });
+
+// 使用者特定模型設定管理 Map<channelId, Map<userId, {provider, name, quality}>>
+const userModelsByChannel = new Map();
 
 /**
- * 清理圖片生成指令，移除尺寸關鍵字。
- * @param {string} rawPrompt 原始指令。
- * @returns {string} 清理後的指令。
+ * 輔助函式：取得使用者在該頻道的模型設定
+ */
+function getUserModel(userId, channelId) {
+  if (!userModelsByChannel.has(channelId)) {
+    userModelsByChannel.set(channelId, new Map());
+  }
+  
+  const channelUserModels = userModelsByChannel.get(channelId);
+  const userChoice = channelUserModels.get(userId);
+  const defaultProvider = config.discord.imageChannelMap[channelId];
+
+  if (userChoice) return userChoice;
+
+  return { 
+    provider: defaultProvider, 
+    name: null, 
+    quality: null 
+  };
+}
+
+/**
+ * 清理圖片生成指令
  */
 function cleanPrompt(rawPrompt) {
   return rawPrompt.replace(/直圖|橫圖/g, '').trim();
 }
 
 /**
- * 根據指令檢測圖片尺寸。
- * @param {string} prompt 原始指令。
- * @returns {string} 對應的圖片尺寸。
+ * 檢測圖片尺寸
  */
 function detectImageSize(prompt) {
   if (prompt.includes('直圖')) return config.openai.imageSize.vertical;
@@ -33,31 +52,77 @@ function detectImageSize(prompt) {
   return config.openai.imageSize.default;
 }
 
-/**
- * 生成並發送圖片到 Discord 頻道。
- * 根據設定檔中的映射決定使用哪個模型。
- * @param {Client} client Discord 客戶端實例。
- */
+// --- 斜線指令定義 ---
+
+const imageModelChoices = config.availableModels
+  .filter(m => m.value.includes('image') || m.value.includes('dall-e'))
+  .map(model => ({ name: model.name, value: model.value }));
+
+const slashCommands = [
+  new SlashCommandBuilder()
+    .setName('切換繪圖模型')
+    .setDescription('切換你在本頻道使用的繪圖模型與畫質')
+    .addStringOption(opt =>
+      opt.setName('設定')
+        .setDescription('選擇模型與畫質組合')
+        .setRequired(true)
+        .addChoices(...imageModelChoices)
+    ),
+  new SlashCommandBuilder()
+    .setName('預設繪圖模型')
+    .setDescription('恢復為本頻道的預設繪圖模型')
+];
+
+// --- 斜線指令處理器 ---
+
+async function handleSlash(interaction) {
+  const userId = interaction.user.id;
+  const channelId = interaction.channel.id;
+
+  if (interaction.commandName === '切換繪圖模型') {
+    const value = interaction.options.getString('設定');
+    const [providerInfo, qualityInfo] = value.split(':');
+    const [provider, modelName] = providerInfo.split('/');
+    const quality = qualityInfo === 'default' ? undefined : qualityInfo;
+
+    if (!userModelsByChannel.has(channelId)) {
+        userModelsByChannel.set(channelId, new Map());
+    }
+    userModelsByChannel.get(channelId).set(userId, { provider, name: modelName, quality });
+
+    const displayName = config.availableModels.find(m => m.value === value)?.name || modelName;
+    return interaction.reply(`✅ 繪圖模型已切換為：**${displayName}** (本頻道有效)`);
+  }
+
+  if (interaction.commandName === '預設繪圖模型') {
+    if (userModelsByChannel.has(channelId)) {
+      userModelsByChannel.get(channelId).delete(userId);
+    }
+    return interaction.reply('✅ 已恢復為此頻道的預設繪圖模型設定。');
+  }
+}
+
+// --- 主程式邏輯 ---
+
 async function generateAndSendImage(client) {
   if (!client.isReady()) {
     await new Promise(resolve => client.once(Events.ClientReady, resolve));
   }
-  
-  // 使用 config 中的映射
-  const channelModelMap = config.discord.imageChannelMap;
 
   client.on('messageCreate', async (message) => {
-    // 檢查頻道是否在設定中
-    const modelToUse = channelModelMap[message.channel.id];
-    if (!modelToUse) return; 
-
     if (message.author.bot) return;
+
+    const currentConfig = getUserModel(message.author.id, message.channel.id);
+    const modelProvider = currentConfig.provider;
+    
+    if (!modelProvider) return; 
 
     const rawPrompt = message.content.trim();
     if (!rawPrompt) return;
 
     const thinkingMsg = await message.reply('🖌️ 生成圖片中，請稍後...');
     const prompt = cleanPrompt(rawPrompt);
+    
     let imageUrl = '';
     let generatorName = '';
     let fileName = '';
@@ -67,14 +132,14 @@ async function generateAndSendImage(client) {
     let geminiResponseText = '';
 
     try {
-      if (modelToUse === 'gemini') {
-        // 使用 Google Gemini 生成圖片
-        generatorName = config.gemini.imageModel;
-        try {
-          const geminiPrompt = rawPrompt;
+      if (modelProvider === 'gemini') {
+        // --- Gemini 處理邏輯 ---
+        generatorName = currentConfig.name || config.gemini.imageModel;
+        const geminiImageModel = genAI.getGenerativeModel({ model: generatorName });
 
+        try {
           const result = await geminiImageModel.generateContent({
-            contents: [{ role: "user", parts: [{ text: geminiPrompt }] }],
+            contents: [{ role: "user", parts: [{ text: rawPrompt }] }],
             generationConfig: {
               responseModalities: ["TEXT", "IMAGE"],
             },
@@ -102,35 +167,41 @@ async function generateAndSendImage(client) {
           }
 
           if (!imageFound) {
-            throw new Error('Gemini 沒有返回圖片數據。');
+            throw new Error('API 回應正常，但未包含圖片數據 (No image data in response)');
           }
 
         } catch (geminiError) {
           console.error('❌ Google Gemini 圖片生成錯誤:', geminiError);
-          if (geminiError.message && geminiError.message.includes('safety')) {
-            await thinkingMsg.edit('❌ Google Gemini 圖片生成失敗：內容可能不符合安全政策，請嘗試其他指令。');
-          } else {
-            await thinkingMsg.edit('❌ Google Gemini 圖片生成失敗，請稍後再試。');
+          
+          // 提取錯誤代碼與訊息
+          const errStatus = geminiError.status || geminiError.code || 'Unknown Status';
+          const errMessage = geminiError.message || JSON.stringify(geminiError);
+
+          // 判斷是否為安全因素
+          let friendlyMsg = '❌ Google Gemini 圖片生成失敗。';
+          if (errMessage.includes('SAFETY') || errMessage.includes('blocked')) {
+             friendlyMsg = '⚠️ 圖片生成失敗：內容可能涉及敏感話題而被 Google 攔截 (Safety Block)。';
           }
+
+          // 顯示詳細錯誤資訊
+          await thinkingMsg.edit(`${friendlyMsg}\n🛠️ **錯誤詳細內容：**\n\`\`\`json\nCode: ${errStatus}\nMessage: ${errMessage}\n\`\`\``);
           return;
         }
 
-      } else if (modelToUse === 'openai') {
-        // 使用 OpenAI 生成圖片
-        generatorName = config.openai.imageModel;
+      } else if (modelProvider === 'openai') {
+        // --- OpenAI 處理邏輯 ---
+        generatorName = currentConfig.name || config.openai.imageModel;
+        const qualitySetting = currentConfig.quality || config.openai.imageQuality || 'standard';
+        imageQuality = qualitySetting; 
         imageSize = detectImageSize(rawPrompt);
-        imageQuality = config.openai.imageQuality || 'auto';
 
         const imageOptions = {
           model: generatorName,
           prompt,
           n: 1,
           size: imageSize,
+          quality: imageQuality
         };
-
-        if (imageQuality && imageQuality !== 'auto') {
-          imageOptions.quality = imageQuality;
-        }
 
         const response = await openai.images.generate(imageOptions);
         
@@ -156,6 +227,7 @@ async function generateAndSendImage(client) {
         return;
       }
 
+      // --- 建立回覆 ---
       const now = new Date();
       const timestamp = now.toLocaleString('zh-TW', { hour12: false });
 
@@ -169,11 +241,11 @@ async function generateAndSendImage(client) {
         )
         .setFooter({ text: `由 ${generatorName} 自動生成` });
 
-      if (modelToUse === 'gemini' && geminiResponseText) {
+      if (modelProvider === 'gemini' && geminiResponseText) {
         embed.addFields({ name: '模型回覆', value: geminiResponseText.substring(0, 1024) });
       }
 
-      if (modelToUse === 'openai') {
+      if (modelProvider === 'openai') {
         if (imageSize && imageSize !== 'undefined') {
           embed.addFields({ name: '圖片尺寸', value: imageSize, inline: true });
         }
@@ -191,12 +263,18 @@ async function generateAndSendImage(client) {
       await thinkingMsg.delete();
 
     } catch (err) {
+      // 全域錯誤處理
       console.error('❌ 生成圖片錯誤:', err);
-      await thinkingMsg.edit(`❌ 圖片生成失敗，請稍後再試。錯誤資訊: ${err.message || '未知錯誤'}`);
+      // 嘗試讀取 OpenAI 或其他 API 的回應錯誤內容
+      const errDetail = err.response?.data?.error?.message || err.message || JSON.stringify(err);
+      
+      await thinkingMsg.edit(`❌ 系統發生錯誤，請稍後再試。\n🛠️ **錯誤詳細內容：**\n\`\`\`${errDetail}\`\`\``);
     }
   });
 }
 
 module.exports = {
   generateAndSendImage,
+  handleSlash,
+  slashCommands
 };

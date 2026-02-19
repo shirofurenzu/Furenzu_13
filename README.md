@@ -161,8 +161,16 @@ F-C0032-001(原)>>F-D0047-091(新)
 [1.10.0]
 1.gemini圖片生成API改為付費，generateAndSendImage.js獨立使用付費gemini key
 
-2026/2/
+2026/2/14
 [1.11.0]
 1.新增gpt-image系列支援，並可以設定畫質
 2.新增aiBotConfig.js，將模型設定由.env移動進去，models.js併入後移除
   變動autoReplyWithGPT、generateAndSendImage
+
+2026/2/19
+[1.12.0]
+1.修改autoReplyWithGPT發生錯誤時提示方式，可顯示錯誤代碼及內容，同時微調generateAndSendImage
+2.新增圖片切換模型功能，可在aiBotConfig.js加入
+3.橫圖值圖邊長修改(1024×1536)
+4.新增.env.example
+5.微調每日天氣顯示方式
