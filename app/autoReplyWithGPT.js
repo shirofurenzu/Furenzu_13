@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const axios = require('axios');
 const config = require('../config/aiBotConfig');
-const AVAILABLE_MODELS = config.availableModels;
+const CHAT_MODELS = config.chatModels;
 
 // --- 常數與初始化 ---
 const DEFAULT_PERSONA = config.openai.persona;
@@ -85,7 +85,7 @@ const slashCommands = [
                 .setDescription('選擇一個 AI 模型')
                 .setRequired(true)
                 .addChoices(
-                    ...AVAILABLE_MODELS.map(model => ({ name: model.name, value: model.value }))
+                    ...CHAT_MODELS.map(model => ({ name: model.name, value: model.value }))
                 )
         ),
     new SlashCommandBuilder().setName('預設模型').setDescription('恢復為頻道的預設模型'),
@@ -160,7 +160,7 @@ async function handleSwitchModel(interaction) {
         const [provider, name] = parts;
         const channelUserModels = getChannelMap(userModelsByChannel, channelId);
         channelUserModels.set(userId, { provider, name });
-        const displayName = AVAILABLE_MODELS.find(m => m.value === modelValue)?.name || modelValue;
+        const displayName = CHAT_MODELS.find(m => m.value === modelValue)?.name || modelValue;
         return interaction.reply(`✅ 模型已為你在**本頻道**切換為 **${displayName}**。`);
     }
     return interaction.reply({ content: '❌ 模型選擇無效。', ephemeral: true });

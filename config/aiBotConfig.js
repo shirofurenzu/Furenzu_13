@@ -67,18 +67,18 @@ const config = {
     imageModel: 'gemini-2.5-flash-image',
   },
 
-  // 可供使用者選擇的模型列表
-  // 格式：'provider/modelName:quality' (若無 quality 可省略或寫 default)
-  availableModels: [
-    // 聊天模型
+// 可供使用者選擇的「聊天」模型列表
+  chatModels: [
     { name: 'OpenAI GPT-5.1', value: 'openai/gpt-5.1' },
     { name: 'OpenAI GPT-5-mini', value: 'openai/gpt-5-mini' },
     { name: 'OpenAI GPT-5-nano', value: 'openai/gpt-5-nano' },
     { name: 'Gemini 3 Flash', value: 'gemini/gemini-3-flash-preview' },
     { name: 'Gemini 2.5 Flash', value: 'gemini/gemini-2.5-flash' },
     { name: 'Gemini 2.5 Flash Lite', value: 'gemini/gemini-2.5-flash-lite' },
+  ],
     
-    // 繪圖模型 (格式: provider/model:quality)
+  // 可供使用者選擇的「繪圖」模型列表 (格式: provider/model:quality)
+  imageModels: [
     { name: 'GPT Image 1.5 (Low)', value: 'openai/gpt-image-1.5:low' },
     { name: 'GPT Image 1.5 (Medium)', value: 'openai/gpt-image-1.5:medium' },
     { name: 'GPT Image 1.5 (High)', value: 'openai/gpt-image-1.5:high' },

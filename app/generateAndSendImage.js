@@ -3,6 +3,7 @@ const { OpenAI } = require('openai');
 const { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } = require('@google/generative-ai');
 const axios = require('axios');
 const config = require('../config/aiBotConfig'); 
+const IMAGE_MODELS = config.imageModels;
 
 // 初始化 OpenAI 客戶端
 const openai = new OpenAI({
@@ -54,10 +55,6 @@ function detectImageSize(prompt) {
 
 // --- 斜線指令定義 ---
 
-const imageModelChoices = config.availableModels
-  .filter(m => m.value.includes('image') || m.value.includes('dall-e'))
-  .map(model => ({ name: model.name, value: model.value }));
-
 const slashCommands = [
   new SlashCommandBuilder()
     .setName('切換繪圖模型')
@@ -66,7 +63,9 @@ const slashCommands = [
       opt.setName('設定')
         .setDescription('選擇模型與畫質組合')
         .setRequired(true)
-        .addChoices(...imageModelChoices)
+        .addChoices(
+          ...IMAGE_MODELS.map(model => ({ name: model.name, value: model.value }))
+        )
     ),
   new SlashCommandBuilder()
     .setName('預設繪圖模型')
@@ -90,7 +89,7 @@ async function handleSlash(interaction) {
     }
     userModelsByChannel.get(channelId).set(userId, { provider, name: modelName, quality });
 
-    const displayName = config.availableModels.find(m => m.value === value)?.name || modelName;
+    const displayName = IMAGE_MODELS.find(m => m.value === value)?.name || modelName;
     return interaction.reply(`✅ 繪圖模型已切換為：**${displayName}** (本頻道有效)`);
   }
 
@@ -120,11 +119,15 @@ async function generateAndSendImage(client) {
     const rawPrompt = message.content.trim();
     if (!rawPrompt) return;
 
-    const thinkingMsg = await message.reply('🖌️ 生成圖片中，請稍後...');
     const prompt = cleanPrompt(rawPrompt);
     
+    // 提前取得模型名稱，以便在提示訊息中顯示
+    let generatorName = currentConfig.name || (modelProvider === 'openai' ? config.openai.imageModel : config.gemini.imageModel);
+    
+    // 將 generatorName 放入回覆訊息中
+    const thinkingMsg = await message.reply(`🖌️ ${generatorName} 生成圖片中，請稍後...`);
+    
     let imageUrl = '';
-    let generatorName = '';
     let fileName = '';
     let attachment = null;
     let imageSize = '';
@@ -134,7 +137,6 @@ async function generateAndSendImage(client) {
     try {
       if (modelProvider === 'gemini') {
         // --- Gemini 處理邏輯 ---
-        generatorName = currentConfig.name || config.gemini.imageModel;
         const geminiImageModel = genAI.getGenerativeModel({ model: generatorName });
 
         try {
@@ -184,13 +186,12 @@ async function generateAndSendImage(client) {
           }
 
           // 顯示詳細錯誤資訊
-          await thinkingMsg.edit(`${friendlyMsg}\n🛠️ **錯誤詳細內容：**\n\`\`\`json\nCode: ${errStatus}\nMessage: ${errMessage}\n\`\`\``);
+          await thinkingMsg.edit(`${friendlyMsg}\n\n🛠️ **錯誤偵錯資訊：**\n\`\`\`json\nCode: ${errStatus}\nMessage: ${errMessage}\n\`\`\``);
           return;
         }
 
       } else if (modelProvider === 'openai') {
         // --- OpenAI 處理邏輯 ---
-        generatorName = currentConfig.name || config.openai.imageModel;
         const qualitySetting = currentConfig.quality || config.openai.imageQuality || 'standard';
         imageQuality = qualitySetting; 
         imageSize = detectImageSize(rawPrompt);
@@ -268,7 +269,7 @@ async function generateAndSendImage(client) {
       // 嘗試讀取 OpenAI 或其他 API 的回應錯誤內容
       const errDetail = err.response?.data?.error?.message || err.message || JSON.stringify(err);
       
-      await thinkingMsg.edit(`❌ 系統發生錯誤，請稍後再試。\n🛠️ **錯誤詳細內容：**\n\`\`\`${errDetail}\`\`\``);
+      await thinkingMsg.edit(`❌ 系統發生錯誤，請稍後再試。\n\n🛠️ **錯誤詳細內容：**\n\`\`\`${errDetail}\`\`\``);
     }
   });
 }
