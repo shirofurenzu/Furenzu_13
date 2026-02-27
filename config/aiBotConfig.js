@@ -84,8 +84,10 @@ const config = {
     { name: 'GPT Image 1.5 (High)', value: 'openai/gpt-image-1.5:high' },
     { name: 'DALL-E 3 (Standard)', value: 'openai/dall-e-3:standard' },
     { name: 'DALL-E 3 (HD)', value: 'openai/dall-e-3:hd' },
-    { name: 'Gemini 2.5 Flash Image', value: 'gemini/gemini-2.5-flash-image:default' },
-    { name: 'Gemini 3 Pro Image', value: 'gemini/gemini-3-pro-image-preview:default' }
+      //gemini要設定Request limit per model per minute for a project in the paid tier 1
+    { name: 'Gemini 2.5 Flash Image', value: 'gemini/gemini-2.5-flash-image:default' },//3
+    { name: 'Gemini 3.1 Flash Image', value: 'gemini/gemini-3.1-flash-image-preview' },//3
+    { name: 'Gemini 3 Pro Image', value: 'gemini/gemini-3-pro-image-preview:default' }//1
   ]
 };
 
