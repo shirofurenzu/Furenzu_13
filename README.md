@@ -182,3 +182,7 @@ F-C0032-001(原)>>F-D0047-091(新)
 2026/2/27
 [1.12.2]
 aiBotConfig.js新增gemini-3.1-flash-image-preview模型
+
+2026/3/4
+[1.12.3]
+aiBotConfig.js新增gemini-3.1-flash-lite-preview模型

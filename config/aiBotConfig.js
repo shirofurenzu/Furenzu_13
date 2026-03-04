@@ -30,7 +30,7 @@ const config = {
       { 
         id: process.env.DISCORD_CHANNEL_GEMINI_CHAT, 
         provider: 'gemini', 
-        name: 'gemini-3-flash-preview' 
+        name: 'gemini-3.1-flash-lite-preview' 
       }
     ],
 
@@ -73,6 +73,7 @@ const config = {
     { name: 'OpenAI GPT-5-mini', value: 'openai/gpt-5-mini' },
     { name: 'OpenAI GPT-5-nano', value: 'openai/gpt-5-nano' },
     { name: 'Gemini 3 Flash', value: 'gemini/gemini-3-flash-preview' },
+    { name: 'Gemini 3.1 Flash Lite', value: 'gemini/gemini-3.1-flash-lite-preview' },
     { name: 'Gemini 2.5 Flash', value: 'gemini/gemini-2.5-flash' },
     { name: 'Gemini 2.5 Flash Lite', value: 'gemini/gemini-2.5-flash-lite' },
   ],
