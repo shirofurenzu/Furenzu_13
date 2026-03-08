@@ -186,3 +186,7 @@ aiBotConfig.js新增gemini-3.1-flash-image-preview模型
 2026/3/4
 [1.12.3]
 aiBotConfig.js新增gemini-3.1-flash-lite-preview模型
+
+2026/3/8
+[1.12.4]
+修正gemini角色問題以符合api規範

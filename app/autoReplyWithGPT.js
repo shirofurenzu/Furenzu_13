@@ -273,7 +273,6 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
 
     let thinkingMessage;
     try {
-        // 恢復顯示完整模型資訊
         thinkingMessage = await message.channel.send(`🤔 思考中 (${currentModelInfo.provider}: ${currentModelInfo.name})...`);
         let answer = '';
 
@@ -286,10 +285,18 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
             answer = response.choices[0].message.content;
         } else if (currentModelInfo.provider === 'gemini') {
             const model = genAI.getGenerativeModel({ model: currentModelInfo.name, systemInstruction: systemPrompt });
-            const history = userContext.slice(0, -1).map(msg => ({
+            
+            // 修正：轉換歷史紀錄並確保第一筆角色必須是 'user'
+            let history = userContext.slice(0, -1).map(msg => ({
                 role: msg.role === 'assistant' ? 'model' : 'user', 
                 parts: [{ text: msg.content }],
             }));
+
+            // 如果 history 陣列的第一個元素角色不是 'user'，則不斷移除首個元素，直到符合 Gemini API 的限制
+            while (history.length > 0 && history[0].role !== 'user') {
+                history.shift();
+            }
+
             const chat = model.startChat({ history });
             const result = await chat.sendMessage(content); 
             answer = result.response.text();
@@ -306,7 +313,6 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
         if (replyHeader.length + answer.length <= DISCORD_LIMIT) {
             await message.channel.send(replyHeader + answer);
         } else {
-            // 分段發送，首段包含標頭
             await message.channel.send(replyHeader);
             for (let i = 0; i < answer.length; i += DISCORD_LIMIT) {
                 await message.channel.send(answer.substring(i, i + DISCORD_LIMIT));
