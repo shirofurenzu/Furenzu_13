@@ -73,7 +73,6 @@ npm start
 ### 3. 配置環境變數
 請將取得的資訊填入 `.env` 檔案中：
 
-**Bash**
 ```bash
 # 建立並編輯 .env
 cp .env.example .env
