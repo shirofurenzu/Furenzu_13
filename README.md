@@ -21,7 +21,7 @@
 
 ### 2. 下載專案
 ```bash
-git clone <您的專案網址>
+git clone https://github.com/shirofurenzu/Furenzu_13.git
 cd Furenzu_13
 ```
 
@@ -30,11 +30,8 @@ cd Furenzu_13
 npm install
 ```
 ### 4. 環境變數設定
-請參考專案中的 .env.example 檔案，建立並編輯您的 .env 檔案：
-```Bash
-cp .env.example .env
-# 編輯 .env 並填入必要的 API 金鑰與頻道 ID，discord說明可參閱下方，Openai及Gemini請至官網申請api
-```
+請參考專案中的 .env.example 檔案，重新命名為 .env 檔案，編輯 .env 並填入必要的 API 金鑰與頻道 ID，discord說明可參閱下方，Openai、Gemini及氣象署請至官網申請API key
+
 ### 5. 啟動機器人
 ```Bash
 npm start
@@ -73,12 +70,8 @@ npm start
 ### 3. 配置環境變數
 請將取得的資訊填入 `.env` 檔案中：
 
-```bash
-# 建立並編輯 .env
-cp .env.example .env
-```
 
-📈 v1.12 更新摘要
+## 📈 v1.12 更新摘要
 最近的重大更新強化了系統的穩定性與使用者體驗：
 
 架構優化：新增 aiBotConfig.js 統一管理 AI 模型參數，將模型設定從環境變數中解耦。
