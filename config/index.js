@@ -28,4 +28,9 @@ module.exports = {
 
   // 每日天氣
   DAILY_WEATHER_CHANNEL_ID: env.DAILY_WEATHER_CHANNEL_ID,
+
+  //每日市場資訊
+  ENABLE_MARKET_REPORT: process.env.ENABLE_MARKET_REPORT === 'false' ? false : true,
+  MARKET_REPORT_CRON: process.env.MARKET_REPORT_CRON,
+  MARKET_REPORT_CHANNEL_ID: process.env.MARKET_REPORT_CHANNEL_ID,
 };

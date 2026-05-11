@@ -194,3 +194,8 @@ aiBotConfig.js新增gemini-3.1-flash-lite-preview模型
 2026/3/12
 [1.12.5]
 修改README、新增CHANGELOG
+
+2026/5/11
+[1.13.0]
+1.新增marketWatcher.js，可定時回報加密貨幣及美股
+2.reminder.js 支援隔年提醒、修正較長時間提醒會報錯、新增刪除並合併提醒的斜線指令(一般、今日、刪除)
