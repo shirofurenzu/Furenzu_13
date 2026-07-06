@@ -1,0 +1,33 @@
+{
+  "__comment": "=== 市場行情 / 持股設定檔說明書 ===",
+  "__usage": "在下列各分類陣列中新增或移除要追蹤的標的。每個標的至少需要 symbol 與 name。",
+  "__symbol_rules": {
+    "crypto": "使用 Yahoo 加密貨幣代號，例如 BTC-USD、ETH-USD",
+    "usStocks": "美股指數/個股代號，指數前面加 ^，例如 ^DJI、^GSPC；個股直接填代號，例如 AAPL、NVDA",
+    "twStocks": "台股上市加上 .TW，上櫃加上 .TWO，例如 台積電 2330.TW；加權指數為 ^TWII"
+  },
+  "__holdings_note": "personalHoldings 為你的實際持股，填入 shares(股數) 與 cost(每股平均成本) 後，機器人會計算市值與損益。台股 1 張 = 1000 股。若暫時不想顯示，將 personalHoldingsEnabled 設為 false 即可，不需清空陣列。",
+  "__schedule_note": "reportCron 為每日定時回報時間 (cron 格式: 分 時 日 月 週)，開關與頻道 ID 仍在 .env 設定 (ENABLE_MARKET_REPORT / MARKET_REPORT_CHANNEL_ID)",
+  "reportCron": "20 8 * * *",
+  "crypto": [
+    { "symbol": "BTC-USD", "name": "比特幣" },
+    { "symbol": "ETH-USD", "name": "以太坊" },
+    { "symbol": "BNB-USD", "name": "幣安幣" },
+    { "symbol": "SOL-USD", "name": "Solana" }
+  ],
+  "usStocks": [
+    { "symbol": "^DJI", "name": "道瓊工業" },
+    { "symbol": "^GSPC", "name": "S&P 500" },
+    { "symbol": "^IXIC", "name": "納斯達克" },
+    { "symbol": "^SOX", "name": "費城半導體" }
+  ],
+  "twStocks": [
+    { "symbol": "^TWII", "name": "台股加權指數" },
+    { "symbol": "0050.TW", "name": "台灣50" }
+    
+  ],
+  "personalHoldingsEnabled": false,
+  "personalHoldings": [
+    { "symbol": "2330.TW", "name": "台積電", "shares": 1000, "cost": 600 }
+  ]
+}
