@@ -204,3 +204,7 @@ aiBotConfig.js新增gemini-3.1-flash-lite-preview模型
 [1.13.1]
 1.marketWatcher.js新增可定時回報台股功能，並將追蹤清單及回報時間轉移至config\marketHoldings.json
 2.新增股價查詢功能
+
+2026/9/19
+[1.13.2]
+更新aiBotConfig中的模型
