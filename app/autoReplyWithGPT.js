@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const axios = require('axios');
@@ -85,7 +85,8 @@ const slashCommands = [
                 .setDescription('選擇一個 AI 模型')
                 .setRequired(true)
                 .addChoices(
-                    ...CHAT_MODELS.map(model => ({ name: model.name, value: model.value }))
+                    ...CHAT_MODELS.map(model => ({ name: model.name, value: model.value })),
+                    { name: '其他模型', value: 'custom' }
                 )
         ),
     new SlashCommandBuilder().setName('預設模型').setDescription('恢復為頻道的預設模型'),
@@ -154,6 +155,20 @@ async function handleSwitchModel(interaction) {
     const userId = interaction.user.id;
     const channelId = interaction.channel.id; 
     const modelValue = interaction.options.getString('模型');
+    if (modelValue === 'custom') {
+        const providerMenu = new StringSelectMenuBuilder()
+            .setCustomId('custom-chat-model-provider')
+            .setPlaceholder('選擇模型供應商')
+            .addOptions(
+                { label: 'OpenAI', value: 'openai' },
+                { label: 'Google Gemini', value: 'gemini' }
+            );
+        return interaction.reply({
+            content: '請先選擇模型供應商：',
+            components: [new ActionRowBuilder().addComponents(providerMenu)],
+            ephemeral: true
+        });
+    }
     const parts = modelValue.split('/');
 
     if (parts.length === 2) {
@@ -164,6 +179,34 @@ async function handleSwitchModel(interaction) {
         return interaction.reply(`✅ 模型已為你在**本頻道**切換為 **${displayName}**。`);
     }
     return interaction.reply({ content: '❌ 模型選擇無效。', ephemeral: true });
+}
+
+async function showCustomModelModal(interaction, provider) {
+    const modal = new ModalBuilder()
+        .setCustomId(`custom-chat-model-${provider}`)
+        .setTitle('設定其他聊天模型');
+    const modelInput = new TextInputBuilder()
+        .setCustomId('model')
+        .setLabel('模型 ID')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(100)
+        .setPlaceholder(provider === 'openai' ? '例如 gpt-5.1' : '例如 gemini-2.5-flash');
+    modal.addComponents(new ActionRowBuilder().addComponents(modelInput));
+    return interaction.showModal(modal);
+}
+
+async function handleCustomModelModal(interaction, provider) {
+    const name = interaction.fields.getTextInputValue('model').trim();
+    if (!name || name.includes('/')) {
+        return interaction.reply({ content: '請輸入有效的模型 ID（不需加供應商前綴）。', ephemeral: true });
+    }
+    const channelUserModels = getChannelMap(userModelsByChannel, interaction.channelId);
+    channelUserModels.set(interaction.user.id, { provider, name });
+    return interaction.reply({
+        content: `✅ 已將你在此頻道的聊天模型切換為 **${provider}/${name}**。若模型不存在或帳戶無權使用，呼叫時會顯示供應商錯誤。`,
+        ephemeral: true
+    });
 }
 
 async function handleDefaultModel(interaction) {
@@ -208,8 +251,28 @@ async function registerSlashCommands(clientId, token) {
 }
 
 async function handleSlash(interaction) {
+    if (!interaction.isChatInputCommand?.()) return;
     const handler = slashCommandHandlers[interaction.commandName];
     if (handler) await handler(interaction);
+}
+
+async function handleComponent(interaction) {
+    if (interaction.isStringSelectMenu?.() && interaction.customId === 'custom-chat-model-provider') {
+        const provider = interaction.values[0];
+        if (!['openai', 'gemini'].includes(provider)) {
+            return interaction.reply({ content: '供應商選擇無效，請重新操作。', ephemeral: true });
+        }
+        await showCustomModelModal(interaction, provider);
+        return;
+    }
+
+    if (interaction.isModalSubmit?.() && interaction.customId.startsWith('custom-chat-model-')) {
+        const provider = interaction.customId.slice('custom-chat-model-'.length);
+        if (!['openai', 'gemini'].includes(provider)) {
+            return interaction.reply({ content: '供應商選擇無效，請重新操作。', ephemeral: true });
+        }
+        await handleCustomModelModal(interaction, provider);
+    }
 }
 
 async function handleMessage(message) {
@@ -329,6 +392,7 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
 
 module.exports = {
     handleSlash,
+    handleComponent,
     handleMessage,
     registerSlashCommands,
     slashCommands 

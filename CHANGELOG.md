@@ -208,3 +208,8 @@ aiBotConfig.js新增gemini-3.1-flash-lite-preview模型
 2026/9/19
 [1.13.2]
 更新aiBotConfig中的模型
+
+2026/10/2
+[1.13.3]
+1.更新aiBotConfig中的模型
+2.ai對話新增其他(自訂)模型功能

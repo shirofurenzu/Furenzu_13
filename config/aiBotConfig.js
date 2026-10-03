@@ -20,12 +20,12 @@ const config = {
       { 
         id: process.env.DISCORD_CHANNEL_CHAT, 
         provider: 'openai', 
-        name: 'gpt-5-mini' 
+        name: 'gpt-6-luna' 
       },
       { 
         id: process.env.DISCORD_CHANNEL_GPT_CHAT, 
         provider: 'openai', 
-        name: 'gpt-5.1' 
+        name: 'gpt-6.1-sol' 
       },
       { 
         id: process.env.DISCORD_CHANNEL_GEMINI_CHAT, 
@@ -69,8 +69,8 @@ const config = {
 
 // 可供使用者選擇的「聊天」模型列表
   chatModels: [
-    { name: 'OpenAI GPT-5.1', value: 'openai/gpt-5.1' },
-    { name: 'OpenAI GPT-5-mini', value: 'openai/gpt-5-mini' },
+    { name: 'OpenAI GPT-6.1-sol', value: 'openai/gpt-6.1-sol' },
+    { name: 'OpenAI GPT-6-luna', value: 'openai/gpt-6-luna' },
     { name: 'OpenAI GPT-5-nano', value: 'openai/gpt-5-nano' },
     { name: 'Gemini 3.8 Flash', value: 'gemini/gemini-3.8-flash' },
     { name: 'Gemini 3.5 Flash Lite', value: 'gemini/gemini-3.5-flash-lite' },

@@ -47,9 +47,17 @@ function handleSlashInteractions(client) {
   const modules = loadedModules.length ? loadedModules : loadModules();
 
   client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-    for (const mod of modules) {
-      if (mod.handleSlash) await mod.handleSlash(interaction);
+    if (interaction.isChatInputCommand()) {
+      for (const mod of modules) {
+        if (mod.handleSlash) await mod.handleSlash(interaction);
+      }
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() || interaction.isModalSubmit()) {
+      for (const mod of modules) {
+        if (mod.handleComponent) await mod.handleComponent(interaction);
+      }
     }
   });
 
