@@ -207,9 +207,16 @@ aiBotConfig.js新增gemini-3.1-flash-lite-preview模型
 
 2026/9/19
 [1.13.2]
-更新aiBotConfig中的模型
+更新aiBotConfig中的模型 
+(Gemini 3.8 Flash、Gemini 3.5 Flash Lite、GPT Image 2.5 sunburst、Gemini 3.1 Flash Lite Image)
 
 2026/10/2
 [1.13.3]
 1.更新aiBotConfig中的模型
-2.ai對話新增其他(自訂)模型功能
+(GPT-6.1-sol、GPT-6-luna)
+2.autoReplyWithGPT新增其他(自訂)模型功能
+
+2026/10/11
+[1.13.4]
+1.更新aiBotConfig中的模型 (Gemini Nano Banana 2.1🍌)
+2.autoReplyWithGPT新增圖片連續對話功能

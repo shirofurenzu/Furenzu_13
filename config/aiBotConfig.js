@@ -3,17 +3,20 @@ require('dotenv').config();
 const config = {
   // Discord 相關設定
   discord: {
-    // 頻道 ID 列表
-    channels: {
-      CHAT: process.env.DISCORD_CHANNEL_CHAT,
-      GPT_CHAT: process.env.DISCORD_CHANNEL_GPT_CHAT,
-      GPT_IMAGE: process.env.DISCORD_CHANNEL_GPT_IMAGE,
-      GEMINI_CHAT: process.env.DISCORD_CHANNEL_GEMINI_CHAT,
-      GEMINI_IMAGE: process.env.DISCORD_CHANNEL_GEMINI_IMAGE,
-    },
+    // 頻道 ID 列表 (似乎用不到)
+    //channels: {
+    //  CHAT: process.env.DISCORD_CHANNEL_CHAT,
+    //  GPT_CHAT: process.env.DISCORD_CHANNEL_GPT_CHAT,
+    //  GPT_IMAGE: process.env.DISCORD_CHANNEL_GPT_IMAGE,
+    //  GEMINI_CHAT: process.env.DISCORD_CHANNEL_GEMINI_CHAT,
+    //  GEMINI_IMAGE: process.env.DISCORD_CHANNEL_GEMINI_IMAGE,
+    // },
     
-    // 對話紀錄數量限制
+    // 對話歷史輪數；一輪包含使用者訊息與 AI 回覆。5 輪等於最多 10 則訊息。
     maxHistory: 5,
+
+    // 單則訊息及對話歷史可保留的圖片總大小上限（MB；預設維持原本 20 MiB）。
+    maxImageContextMB: 20,
 
     // [聊天頻道] 的模型配置
     chatChannelConfig: [
@@ -64,7 +67,7 @@ const config = {
     apiKeyPaid: process.env.GEMINI_API_KEY_Paid, // 付費版 Key (Image)
     
     // 預設圖片生成設定
-    imageModel: 'gemini-3.1-flash-image',
+    imageModel: 'gemini-nano-banana-2.1',
   },
 
 // 可供使用者選擇的「聊天」模型列表
@@ -84,6 +87,7 @@ const config = {
     { name: 'GPT Image 2.5 sunburst (High)', value: 'openai/gpt-image-2.5-sunburst:high' },
         //gemini要設定api與服務/Request limit per model per minute for a project in the paid tier 1
     { name: 'Gemini 3.1 Flash Lite Image', value: 'gemini/gemini-3.1-flash-lite-image' },//3
+    { name: 'Gemini Nano Banana 2.1🍌', value: 'gemini/gemini-nano-banana-2.1' },//3
     { name: 'Gemini 3.1 Flash Image', value: 'gemini/gemini-3.1-flash-image' },//3
     { name: 'Gemini 3 Pro Image', value: 'gemini/gemini-3-pro-image:default' }//1
   ]

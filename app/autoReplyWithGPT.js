@@ -7,7 +7,16 @@ const CHAT_MODELS = config.chatModels;
 
 // --- 常數與初始化 ---
 const DEFAULT_PERSONA = config.openai.persona;
-const CONTEXT_HISTORY_LIMIT = 10; 
+const configuredHistoryTurns = Number(config.discord.maxHistory);
+const CONTEXT_HISTORY_LIMIT = Number.isInteger(configuredHistoryTurns) && configuredHistoryTurns > 0
+    ? configuredHistoryTurns * 2
+    : 10;
+const configuredImageLimitMB = Number(config.discord.maxImageContextMB);
+const CONTEXT_IMAGE_MAX_MB = Number.isFinite(configuredImageLimitMB) && configuredImageLimitMB > 0
+    ? configuredImageLimitMB
+    : 20;
+const CONTEXT_IMAGE_MAX_BYTES = Math.floor(CONTEXT_IMAGE_MAX_MB * 1024 * 1024);
+const CONTEXT_IMAGE_MAX_LABEL = `${CONTEXT_IMAGE_MAX_MB} MB`;
 
 // 初始化 API 客戶端
 const openai = new OpenAI({ apiKey: config.openai.apiKey });
@@ -60,14 +69,71 @@ function getUserModel(userId, channelId) {
     return CHANNEL_MODEL_MAP[channelId]; 
 }
 
-async function urlToGenerativePart(url, mimeType) {
+function getMessageImages(content) {
+    if (!Array.isArray(content)) return [];
+    return content.filter(part => part.type === 'image' && part.data);
+}
+
+function getContextImageBytes(context) {
+    return context.reduce((total, message) => {
+        return total + getMessageImages(message.content).reduce((messageTotal, image) => {
+            return messageTotal + Buffer.byteLength(image.data, 'base64');
+        }, 0);
+    }, 0);
+}
+
+function prepareContext(previousContext, userMessage) {
+    const userImageBytes = getContextImageBytes([userMessage]);
+    if (userImageBytes > CONTEXT_IMAGE_MAX_BYTES) {
+        throw new Error(`這則訊息的圖片總大小超過對話可保留的 ${CONTEXT_IMAGE_MAX_LABEL} 上限，請減少圖片數量或改傳較小的圖片。`);
+    }
+
+    const context = [...previousContext, userMessage].slice(-CONTEXT_HISTORY_LIMIT);
+    while (context.length > 0 && context[0].role !== 'user') context.shift();
+    while (context.length > 1 && getContextImageBytes(context) > CONTEXT_IMAGE_MAX_BYTES) {
+        context.shift();
+        while (context.length > 0 && context[0].role !== 'user') context.shift();
+    }
+    return context;
+}
+
+function toOpenAIMessage(message) {
+    if (!Array.isArray(message.content)) return message;
+    return {
+        role: message.role,
+        content: message.content.map(part => {
+            if (part.type === 'image') {
+                return {
+                    type: 'image_url',
+                    image_url: { url: `data:${part.mimeType};base64,${part.data}` },
+                };
+            }
+            return { type: 'text', text: part.text };
+        }),
+    };
+}
+
+function toGeminiParts(content) {
+    if (!Array.isArray(content)) return [{ text: content }];
+    return content.map(part => part.type === 'image'
+        ? { inlineData: { data: part.data, mimeType: part.mimeType } }
+        : { text: part.text });
+}
+
+async function downloadImageAttachment(attachment) {
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const base64 = Buffer.from(response.data).toString('base64');
-        return { inlineData: { data: base64, mimeType } };
+        const response = await axios.get(attachment.url, {
+            responseType: 'arraybuffer',
+            maxContentLength: CONTEXT_IMAGE_MAX_BYTES,
+        });
+        return {
+            type: 'image',
+            data: Buffer.from(response.data).toString('base64'),
+            mimeType: attachment.contentType,
+        };
     } catch (error) {
-        console.error("將 URL 轉換為 Generative Part 時發生錯誤:", error);
-        throw new Error(`無法處理圖片，原因: ${error.message}`);
+        console.error('下載 Discord 圖片時發生錯誤:', error);
+        throw new Error(`無法讀取圖片，原因: ${error.message}`);
     }
 }
 
@@ -283,40 +349,66 @@ async function handleMessage(message) {
     const userId = message.author.id;
     const currentModelInfo = getUserModel(userId, channelId);
     const systemPrompt = getSystemPrompt(userId, channelId); 
-    const attachment = message.attachments.first();
+    const imageAttachments = Array.from(message.attachments.values())
+        .filter(attachment => attachment.contentType?.startsWith('image/'));
 
-    if (attachment && attachment.contentType?.startsWith("image/")) {
-        await handleImageMessage(message, currentModelInfo, systemPrompt, message.content.trim(), attachment);
+    if (imageAttachments.length > 0) {
+        await handleImageMessage(message, currentModelInfo, systemPrompt, message.content.trim(), imageAttachments);
     } else {
         await handleTextMessage(message, currentModelInfo, systemPrompt, message.content.trim());
     }
 }
 
-async function handleImageMessage(message, currentModelInfo, systemPrompt, textContent, attachment) {
+async function handleImageMessage(message, currentModelInfo, systemPrompt, textContent, attachments) {
     let thinkingMsg;
     try {
+        const declaredImageBytes = attachments.reduce((total, attachment) => total + (attachment.size || 0), 0);
+        if (declaredImageBytes > CONTEXT_IMAGE_MAX_BYTES) {
+            throw new Error(`這則訊息的圖片總大小超過對話可保留的 ${CONTEXT_IMAGE_MAX_LABEL} 上限，請減少圖片數量或改傳較小的圖片。`);
+        }
+
+        const imageParts = await Promise.all(attachments.map(downloadImageAttachment));
+        const userMessage = {
+            role: 'user',
+            content: [
+                { type: 'text', text: textContent || '請描述這張圖片。' },
+                ...imageParts,
+            ],
+        };
+        const channelSessions = getChannelMap(userSessionsByChannel, message.channel.id);
+        const previousContext = channelSessions.get(message.author.id) || [];
+        const userContext = prepareContext(previousContext, userMessage);
+
         thinkingMsg = await message.channel.send(`🖼️ 分析圖片中 (${currentModelInfo.provider}: ${currentModelInfo.name})...`);
+        let answer = '';
 
         if (currentModelInfo.provider === 'openai') {
             const response = await openai.chat.completions.create({
-                model: currentModelInfo.name, 
-                messages: [{
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: textContent || '請描述這張圖片。' }, 
-                        { type: 'image_url', image_url: { url: attachment.url } } 
-                    ]
-                }]
+                model: currentModelInfo.name,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    ...userContext.map(toOpenAIMessage),
+                ],
+                temperature: 1,
             });
-            await thinkingMsg.delete();
-            await message.reply(`📷 OpenAI (${currentModelInfo.name}) 分析結果：\n${response.choices[0].message.content}`);
+            answer = response.choices[0].message.content || '';
         } else if (currentModelInfo.provider === 'gemini') {
-            const imagePart = await urlToGenerativePart(attachment.url, attachment.contentType);
             const model = genAI.getGenerativeModel({ model: currentModelInfo.name, systemInstruction: systemPrompt });
-            const result = await model.generateContent({ contents: [{ role: 'user', parts: [imagePart, { text: textContent || '請描述這張圖片。' }] }] });
-            await thinkingMsg.delete();
-            await message.reply(`📷 Gemini (${currentModelInfo.name}) 分析結果：\n${result.response.text()}`);
+            const history = userContext.slice(0, -1).map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: toGeminiParts(msg.content),
+            }));
+            const chat = model.startChat({ history });
+            const result = await chat.sendMessage(toGeminiParts(userMessage.content));
+            answer = result.response.text();
+        } else {
+            throw new Error(`不支援的模型供應商: ${currentModelInfo.provider}`);
         }
+
+        userContext.push({ role: 'assistant', content: answer });
+        channelSessions.set(message.author.id, userContext);
+        await thinkingMsg.delete();
+        await message.reply(`📷 ${currentModelInfo.provider === 'openai' ? 'OpenAI' : 'Gemini'} (${currentModelInfo.name}) 分析結果：\n${answer}`);
     } catch (err) {
         console.error(`${currentModelInfo.provider} 圖片分析失敗：`, err);
         const errorDetail = `❌ ${currentModelInfo.provider}: ${currentModelInfo.name} 分析失敗\n🛠️ **錯誤詳細內容：**\n\`\`\` ${err.message}${err.status ? ` (Status: ${err.status})` : ''}\n\`\`\``;
@@ -329,10 +421,8 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
     const userId = message.author.id;
     const channelId = message.channel.id;
     const channelSessions = getChannelMap(userSessionsByChannel, channelId);
-    const userContext = channelSessions.get(userId) || []; 
-
-    userContext.push({ role: 'user', content }); 
-    if (userContext.length > CONTEXT_HISTORY_LIMIT) userContext.shift();
+    const previousContext = channelSessions.get(userId) || [];
+    const userContext = prepareContext(previousContext, { role: 'user', content });
 
     let thinkingMessage;
     try {
@@ -342,27 +432,25 @@ async function handleTextMessage(message, currentModelInfo, systemPrompt, conten
         if (currentModelInfo.provider === 'openai') {
             const response = await openai.chat.completions.create({
                 model: currentModelInfo.name,
-                messages: [{ role: 'system', content: systemPrompt }, ...userContext],
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    ...userContext.map(toOpenAIMessage),
+                ],
                 temperature: 1, 
             });
-            answer = response.choices[0].message.content;
+            answer = response.choices[0].message.content || '';
         } else if (currentModelInfo.provider === 'gemini') {
             const model = genAI.getGenerativeModel({ model: currentModelInfo.name, systemInstruction: systemPrompt });
-            
-            // 修正：轉換歷史紀錄並確保第一筆角色必須是 'user'
-            let history = userContext.slice(0, -1).map(msg => ({
-                role: msg.role === 'assistant' ? 'model' : 'user', 
-                parts: [{ text: msg.content }],
+
+            const history = userContext.slice(0, -1).map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: toGeminiParts(msg.content),
             }));
-
-            // 如果 history 陣列的第一個元素角色不是 'user'，則不斷移除首個元素，直到符合 Gemini API 的限制
-            while (history.length > 0 && history[0].role !== 'user') {
-                history.shift();
-            }
-
             const chat = model.startChat({ history });
-            const result = await chat.sendMessage(content); 
+            const result = await chat.sendMessage(toGeminiParts(content));
             answer = result.response.text();
+        } else {
+            throw new Error(`不支援的模型供應商: ${currentModelInfo.provider}`);
         }
 
         userContext.push({ role: 'assistant', content: answer }); 
