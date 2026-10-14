@@ -26,13 +26,13 @@ function getUserModel(userId, channelId) {
   
   const channelUserModels = userModelsByChannel.get(channelId);
   const userChoice = channelUserModels.get(userId);
-  const defaultProvider = config.discord.imageChannelMap[channelId];
+  const channelDefaults = config.discord.imageChannelMap[channelId];
 
   if (userChoice) return userChoice;
 
   return { 
-    provider: defaultProvider, 
-    name: null, 
+    provider: channelDefaults?.provider,
+    name: channelDefaults?.name || null,
     quality: null 
   };
 }
@@ -122,7 +122,7 @@ async function generateAndSendImage(client) {
     const prompt = cleanPrompt(rawPrompt);
     
     // 提前取得模型名稱，以便在提示訊息中顯示
-    let generatorName = currentConfig.name || (modelProvider === 'openai' ? config.openai.imageModel : config.gemini.imageModel);
+    const generatorName = currentConfig.name;
     
     // 將 generatorName 放入回覆訊息中
     const thinkingMsg = await message.reply(`🖌️ ${generatorName} 生成圖片中，請稍後...`);

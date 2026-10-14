@@ -8,6 +8,7 @@ Furenzu_13 是以 Node.js 與 Discord.js 建置的 Discord 機器人，整合 Op
 
 - 在已設定的聊天頻道使用 OpenAI 或 Google Gemini 回覆文字與分析上傳圖片。
 - 對話紀錄依使用者與頻道分開保存，最多 10 筆訊息。
+- 可在指定頻道啟用個人長期記憶；記憶以頻道和使用者分開，存成可手動編輯的 Markdown 檔。
 - 支援對話風格、模型切換、翻譯與清除對話紀錄。
 - 在已設定的繪圖頻道傳送文字即可生成圖片，支援 OpenAI 與 Gemini。
 - OpenAI 提示可加入 `直圖` 或 `橫圖` 切換尺寸；未指定時使用正方形尺寸。
@@ -79,18 +80,30 @@ DISCORD_CLIENT_ID=
 
 #### AI 頻道與 API
 
+以下五個頻道變數都可設定一個或多個頻道 ID；多個 ID 請以逗號分隔。頻道可來自不同伺服器，但同一頻道不要同時配置到不同模型變數。修改 `.env` 後需重新啟動 bot。
+
 ```dotenv
-DISCORD_CHANNEL_CHAT=
+DISCORD_CHANNEL_CHAT=頻道ID1,頻道ID2
 DISCORD_CHANNEL_GPT_CHAT=
 DISCORD_CHANNEL_GPT_IMAGE=
 DISCORD_CHANNEL_GEMINI_CHAT=
 DISCORD_CHANNEL_GEMINI_IMAGE=
+DISCORD_MEMORY_CHANNELS=
 OPEN_AI_API_KEY=
 GEMINI_API_KEY=
 GEMINI_API_KEY_Paid=
 ```
 
 未設定某個聊天或繪圖頻道 ID 時，該頻道不會啟用相應功能。
+
+#### 長期記憶
+
+在 `DISCORD_MEMORY_CHANNELS` 填入頻道 ID（可多個，逗號分隔；留白則停用），該頻道必須同時是 AI 聊天頻道。bot 需要該頻道的「讀取訊息歷史」權限。
+
+- 每位使用者在每個頻道累積一定輪數的對話（你的訊息＋bot 回覆）後，bot 會整理一次重點，預設與短期記憶輪數 `maxHistory` 相同（5 輪），可在 `config/aiBotConfig.js` 的 `memoryReviewMessageInterval` 自訂；說「記住……」「幫我記得……」「忘掉……」會立即整理。
+- 記憶檔存在 `data/memory/<頻道ID>_<使用者ID>.md`，可直接打開編輯：`手動記憶` 區 bot 不會改動，`AI 整理記憶` 區由 bot 維護（舊版會備份成 `.bak`）。
+- 整理用的模型在 `config/aiBotConfig.js` 的 `memoryModel` 設定。整理失敗會自動重試，連續失敗 3 次時 bot 會提示並讓使用者暫時改用其他模型（重啟後恢復預設）。
+- 本機只保存整理後的記憶，不保存對話原文。
 
 #### 天氣、每日提醒與市場報表
 

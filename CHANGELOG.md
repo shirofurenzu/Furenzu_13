@@ -220,3 +220,9 @@ aiBotConfig.js新增gemini-3.1-flash-lite-preview模型
 [1.13.4]
 1.更新aiBotConfig中的模型 (Gemini Nano Banana 2.1🍌)
 2.autoReplyWithGPT新增圖片連續對話功能
+
+2026/10/14
+[1.14.0]
+1.新增長期記憶功能longtermMemory.js
+2.每個模型頻道支援多個頻道ID，於.env設置
+3.修改aiBotConfig模型配置方式

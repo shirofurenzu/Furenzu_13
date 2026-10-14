@@ -11,7 +11,7 @@ function loadModules() {
   fs.readdirSync(modulesPath).forEach(file => {
     if (file.endsWith('.js')) {
       const mod = require(path.join(modulesPath, file));
-      if (mod.handleSlash || mod.handleMessage) {
+      if (mod.handleSlash || mod.handleMessage || mod.handleComponent) {
         loadedModules.push(mod);
       }
     }
@@ -46,24 +46,33 @@ async function registerAllSlashCommands(clientId, token) {
 function handleSlashInteractions(client) {
   const modules = loadedModules.length ? loadedModules : loadModules();
 
+  // 單一模組出錯（例如互動逾時）只記錄錯誤，不讓整個 bot 因未處理的 error 事件而結束。
+  async function runSafely(label, task) {
+    try {
+      await task();
+    } catch (error) {
+      console.error(`${label} 執行失敗：`, error);
+    }
+  }
+
   client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
       for (const mod of modules) {
-        if (mod.handleSlash) await mod.handleSlash(interaction);
+        if (mod.handleSlash) await runSafely(`斜線指令 /${interaction.commandName}`, () => mod.handleSlash(interaction));
       }
       return;
     }
 
     if (interaction.isStringSelectMenu() || interaction.isModalSubmit()) {
       for (const mod of modules) {
-        if (mod.handleComponent) await mod.handleComponent(interaction);
+        if (mod.handleComponent) await runSafely(`互動元件 ${interaction.customId}`, () => mod.handleComponent(interaction));
       }
     }
   });
 
   client.on('messageCreate', async (message) => {
     for (const mod of modules) {
-      if (mod.handleMessage) await mod.handleMessage(message);
+      if (mod.handleMessage) await runSafely('訊息處理', () => mod.handleMessage(message));
     }
   });
 }
